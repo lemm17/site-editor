@@ -1,16 +1,12 @@
 import {
 	CFDFSTraverse,
-	ChildrenSetter,
 	constructFrameFacade,
-	correctChildIndexes,
 	createBubbleEventFunc,
 	createWidgetFacadeConstructor,
-	getEdgesInfo,
-	getWFByPath,
-	cloneSmartPathOfTargetAndIncrementIfNeed,
-	insertTextCrossWidget,
-	splitChildrenByPosition,
 	toFrame,
+	deleteContent,
+	insertText,
+	addWidget,
 } from 'utils';
 import {
 	IFrame,
@@ -37,20 +33,22 @@ import { AddAction, InputAction } from './Action';
 
 export default class FrameFacade implements IFrameFacade {
 	readonly children: IWidgetFacade[];
-	private readonly _bubbleEvent: BubbleEventFunc;
-	private readonly _facadeMap: Record<WIDGETS, IWidgetFacadeConstructor>;
-	private readonly _widgetFacadeConstructor: WidgetFacadeConstructor;
-	private readonly _focusCallbackMap: WeakMap<IWidgetFacade, FocusCallback> =
-		new Map();
-	private readonly _onAction: <T extends ACTION, D>(
-		action: IAction<T, D>
-	) => void;
+	readonly widgetFacadeConstructor: WidgetFacadeConstructor;
+
 	get path(): Path {
 		return [];
 	}
 	get smartPath(): SmartPath {
 		return [];
 	}
+
+	private readonly _bubbleEvent: BubbleEventFunc;
+	private readonly _facadeMap: Record<WIDGETS, IWidgetFacadeConstructor>;
+	private readonly _focusCallbackMap: WeakMap<IWidgetFacade, FocusCallback> =
+		new Map();
+	private readonly _onAction: <T extends ACTION, D>(
+		action: IAction<T, D>
+	) => void;
 
 	constructor(
 		frame: IFrame,
@@ -65,7 +63,7 @@ export default class FrameFacade implements IFrameFacade {
 		this.children = constructFrameFacade(frame, widgetFacadeConstructor);
 		this._bubbleEvent = bubbleEvent;
 		this._facadeMap = facadeMap;
-		this._widgetFacadeConstructor = widgetFacadeConstructor;
+		this.widgetFacadeConstructor = widgetFacadeConstructor;
 		this._onAction = onAction;
 	}
 
@@ -120,13 +118,13 @@ export default class FrameFacade implements IFrameFacade {
 	private _onDeleteContentForward(
 		action: IInputAction<IDeleteContentForwardActionData>
 	): void {
-		return;
+		deleteContent(false, action.target, action.data.selection);
 	}
 
 	private _onDeleteContentBackward(
 		action: IInputAction<IDeleteContentBackwardActionData>
 	): void {
-		return;
+		deleteContent(true, action.target, action.data.selection);
 	}
 
 	private _onInsertParagraph(
@@ -136,53 +134,15 @@ export default class FrameFacade implements IFrameFacade {
 	}
 
 	private _onInsertText(action: IInputAction<IInsertTextActionData>): void {
-		const text = action.data.text;
-		const target = action.target;
-
-		const edgesInfo = getEdgesInfo(target, action.data.selection);
-
-		if (edgesInfo.startChild === edgesInfo.endChild) {
-			edgesInfo.startChild.insertText(
-				text,
-				edgesInfo.startIndexRelativeToStartChild,
-				edgesInfo.endIndexRelativeToEndChild
-			);
-		} else {
-			const newChildren = insertTextCrossWidget(target, text, edgesInfo);
-
-			const setter = ChildrenSetter.getSetter(target.children);
-			setter(newChildren);
-			target.children = newChildren;
-		}
+		insertText(action.target, action.data.selection, action.data.text);
 	}
 
-	/**
-	 * TODO: Вынести внутрянку в хэлпер
-	 */
 	private _onAdd(action: IAddAction): void {
-		const smartPathForNewElement = cloneSmartPathOfTargetAndIncrementIfNeed(
-			action.target as IWidgetFacade,
-			action.data.position === 'after'
-		);
-
-		const parentPath = action.target.path.slice(0, -1);
-		const parent = getWFByPath(this, parentPath);
-		const sample = action.getSample(this._facadeMap);
-		const newWidget = this._widgetFacadeConstructor(
-			sample,
-			smartPathForNewElement,
-			parent.toFrame()
-		) as IWidgetFacade;
-
-		const [leftPart, rightPart] = splitChildrenByPosition(
+		addWidget(
 			this,
-			action.target as IWidgetFacade,
-			action.data.position
+			action.target,
+			action.data.position,
+			action.getSample(this._facadeMap)
 		);
-
-		const newChildren = [...leftPart, newWidget, ...rightPart];
-		correctChildIndexes(rightPart, leftPart.length + 1);
-
-		parent.children = newChildren;
 	}
 }

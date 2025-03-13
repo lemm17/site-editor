@@ -99,7 +99,6 @@ export interface IInsertParagraphActionData extends IBaseInputActionData {
 }
 export interface IDeleteContentBackwardActionData extends IBaseInputActionData {
 	type: 'deleteContentBackward';
-	text: string;
 }
 export interface IDeleteContentForwardActionData extends IBaseInputActionData {
 	type: 'deleteContentForward';
@@ -225,6 +224,8 @@ export type IFrame = ['frame', {}, ...IWidget[]];
 export type FocusCallback = (selection: ISelection) => void;
 
 export interface IFrameFacade extends IFacade<IBaseFacade> {
+	readonly widgetFacadeConstructor: WidgetFacadeConstructor;
+
 	children: IWidgetFacade[];
 
 	subscribeFocus(id: IWidgetFacade, callback: FocusCallback): void;

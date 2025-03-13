@@ -3,7 +3,7 @@ import {
 	IPlainTextFacadeCfg,
 	PLAIN_TEXT_FACADE_TYPE as TYPE,
 } from 'types';
-import { insertText as insertTextInner } from 'utils';
+import { insertTextPlain as insertTextInner } from 'utils';
 import BaseFacade from './BaseFacade';
 
 export default class PlainTextFacade
