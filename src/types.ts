@@ -49,8 +49,8 @@ export interface IAction<
 
 export interface IAddAction
 	extends IAction<ACTION.ADD, IAddActionData, IBaseFacade> {
-		getSample(facadeMap: Record<WIDGETS, IWidgetFacadeConstructor>): IWidget
-	}
+	getSample(facadeMap: Record<WIDGETS, IWidgetFacadeConstructor>): IWidget;
+}
 export interface IAddActionDataByWidget {
 	position: Position;
 	widget: WIDGETS;
@@ -150,7 +150,7 @@ export interface IFacade<T extends IFacade<T>> {
 	get path(): Path;
 	get smartPath(): SmartPath;
 
-	_handleEvent<T extends ACTION, D>(action: IAction<T, D>): void;
+	_handleAction<T extends ACTION, D>(action: IAction<T, D>): void;
 	toFrame(): IWidget | IFrame | string;
 }
 

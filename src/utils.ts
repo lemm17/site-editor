@@ -27,3 +27,4 @@ export { default as insertTextCrossWidget } from './_utils/actions/insertTextCro
 export { default as getWFByPath } from './_utils/actions/getWFByPath';
 export { default as splitChildrenByPosition } from './_utils/actions/splitChildrenByPosition';
 export { default as cloneSmartPathOfTargetAndIncrementIfNeed } from './_utils/actions/incrementSmartPath';
+export { default as highlightJSON } from './_utils/highlightJSON';

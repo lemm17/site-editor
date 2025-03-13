@@ -19,10 +19,12 @@ interface IEditorProps {
 export default function Editor({ frameFacade, componentMap }: IEditorProps) {
 	return (
 		<EditorContext.Provider value={{ frameFacade, cursorOffset: null }}>
-			<RecursiveRender
-				children={frameFacade.children}
-				componentMap={componentMap}
-			/>
+			<div class='editor'>
+				<RecursiveRender
+					children={frameFacade.children}
+					componentMap={componentMap}
+				/>
+			</div>
 		</EditorContext.Provider>
 	);
 }

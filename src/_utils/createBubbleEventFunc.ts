@@ -19,10 +19,10 @@ export default function createBubbleEventFunc(
 
 		while (callStack.length) {
 			const currentWidget = callStack.pop();
-			currentWidget._handleEvent(action);
+			currentWidget._handleAction(action);
 
 			if (action.stopped) {
-				frameFacade._handleEvent(action);
+				frameFacade._handleAction(action);
 			}
 		}
 	};

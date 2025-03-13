@@ -74,7 +74,7 @@ export default abstract class BaseFacade<Properties extends IProperties = {}>
 		return widgetToFrame(this);
 	}
 
-	_handleEvent<T extends ACTION, D>(
+	_handleAction<T extends ACTION, D>(
 		action: IAction<T, D, IWidgetFacade<{}> | IWidgetFacade<{}>[]>
 	): void {
 		if (action instanceof AddAction) {

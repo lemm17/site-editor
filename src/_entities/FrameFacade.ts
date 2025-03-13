@@ -25,9 +25,6 @@ import {
 	IAddAction,
 	SmartPath,
 	WidgetFacadeConstructor,
-	Index,
-	IWidget,
-	UUID,
 	FocusCallback,
 	ISelection,
 	IInputAction,
@@ -35,7 +32,6 @@ import {
 	IInsertParagraphActionData,
 	IDeleteContentBackwardActionData,
 	IDeleteContentForwardActionData,
-	SmartIndex,
 } from 'types';
 import { AddAction, InputAction } from './Action';
 
@@ -44,12 +40,11 @@ export default class FrameFacade implements IFrameFacade {
 	private readonly _bubbleEvent: BubbleEventFunc;
 	private readonly _facadeMap: Record<WIDGETS, IWidgetFacadeConstructor>;
 	private readonly _widgetFacadeConstructor: WidgetFacadeConstructor;
-	private _selection: {
-		id: UUID;
-		selection: ISelection;
-	};
 	private readonly _focusCallbackMap: WeakMap<IWidgetFacade, FocusCallback> =
 		new Map();
+	private readonly _onAction: <T extends ACTION, D>(
+		action: IAction<T, D>
+	) => void;
 	get path(): Path {
 		return [];
 	}
@@ -59,7 +54,8 @@ export default class FrameFacade implements IFrameFacade {
 
 	constructor(
 		frame: IFrame,
-		facadeMap: Record<WIDGETS, IWidgetFacadeConstructor>
+		facadeMap: Record<WIDGETS, IWidgetFacadeConstructor>,
+		onAction: <T extends ACTION, D>(action: IAction<T, D>) => void
 	) {
 		const bubbleEvent = createBubbleEventFunc(this);
 		const widgetFacadeConstructor = createWidgetFacadeConstructor(
@@ -70,15 +66,18 @@ export default class FrameFacade implements IFrameFacade {
 		this._bubbleEvent = bubbleEvent;
 		this._facadeMap = facadeMap;
 		this._widgetFacadeConstructor = widgetFacadeConstructor;
+		this._onAction = onAction;
 	}
 
-	_handleEvent<T extends ACTION, D>(action: IAction<T, D>): void {
+	_handleAction<T extends ACTION, D>(action: IAction<T, D>): void {
 		if (!action.defaultPrevented) {
 			if (action instanceof AddAction) {
 				this._onAdd(action);
 			} else if (action instanceof InputAction) {
 				this._onInput(action);
 			}
+
+			this._onAction(action);
 		}
 	}
 
