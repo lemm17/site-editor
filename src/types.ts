@@ -1,4 +1,4 @@
-import { JSXElement } from 'solid-js';
+import { Accessor, JSXElement } from 'solid-js';
 
 export type UUID = string;
 
@@ -147,7 +147,8 @@ export interface IFacade<T extends IFacade<T>> {
 	children: T[];
 
 	get path(): Path;
-	get smartPath(): SmartPath;
+
+	smartPath: SmartPath;
 
 	_handleAction<T extends ACTION, D>(action: IAction<T, D>): void;
 	toFrame(): IWidget | IFrame | string;
@@ -189,7 +190,14 @@ export interface IPlainTextFacade extends IBaseFacade {
 	readonly type: typeof PLAIN_TEXT_FACADE_TYPE;
 	readonly properties: {};
 
+	_createTextSignal(): Accessor<string>;
+
 	insertText(insertText: string, startIndex: number, endIndex?: number): void;
+	insertTextForce(
+		insertText: string,
+		startIndex: number,
+		endIndex?: number
+	): void;
 	toFrame(): string;
 }
 
@@ -225,6 +233,7 @@ export type FocusCallback = (selection: ISelection) => void;
 
 export interface IFrameFacade extends IFacade<IBaseFacade> {
 	readonly widgetFacadeConstructor: WidgetFacadeConstructor;
+	readonly widgetFacadeCreator: WidgetFacadeCreator;
 
 	children: IWidgetFacade[];
 
@@ -290,7 +299,7 @@ export abstract class Frame {
 		return false;
 	}
 
-	static getName(widget: IWidget): string {
+	static getName(widget: IWidget): WIDGETS {
 		return widget[0];
 	}
 
@@ -343,11 +352,21 @@ export interface IEmojiProps {
 	value: string;
 }
 
-export type WidgetFacadeConstructor = (
-	widget: IWidget,
+export interface ITextProps {}
+
+export type WidgetFacadeConstructor = <P extends object = {}>(
+	widget: IWidget<P>,
 	path: SmartPath,
 	parent: IWidget
-) => IBaseFacade;
+) => IBaseFacade<P> | IPlainTextFacade;
+
+export type WidgetFacadeCreator = <P extends object = {}>(
+	type: WIDGETS | typeof PLAIN_TEXT_FACADE_TYPE,
+	path: SmartPath,
+	properties: P,
+	children: IBaseFacade[],
+	text?: string
+) => IBaseFacade<P> | IPlainTextFacade;
 
 export interface IEdgesInfo {
 	startChild: IPlainTextFacade;

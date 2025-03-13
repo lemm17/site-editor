@@ -1,4 +1,4 @@
-import { children, For, Show, onMount } from 'solid-js';
+import { children, For, Show, onMount, createSignal } from 'solid-js';
 import {
 	WIDGETS,
 	IWidgetComponentProps,
@@ -97,9 +97,12 @@ function ComponentWrapper<T extends object = {}>(
 
 	// Костыль
 	if (isPlainTextFacade(value as unknown as IPlainTextFacade)) {
+		const plainTextFacade = value as unknown as IPlainTextFacade;
+		const getText = plainTextFacade._createTextSignal();
+
 		return (
-			<span class={RENDER_CLASS} id={value.id}>
-				{(value as unknown as IPlainTextFacade).text}
+			<span class={RENDER_CLASS} id={plainTextFacade.id}>
+				{getText()}
 			</span>
 		);
 	}

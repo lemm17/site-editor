@@ -52,6 +52,15 @@ export default function Text(props: ITextWidgetComponentProps<ITextProps>) {
 			} else {
 				selection = computeSelection();
 
+				if (e.inputType === 'insertParagraph') {
+					e.preventDefault();
+					props.value.input({
+						type: 'insertParagraph',
+						timeStamp: e.timeStamp,
+						selection,
+					});
+				}
+
 				handleExtremeCaseOnInsertText(e, selection, props.value, () => {
 					/**
 					 * В таком кейсе коллбек вызовется если хэлпер запревентит событие.
@@ -59,7 +68,6 @@ export default function Text(props: ITextWidgetComponentProps<ITextProps>) {
 					 * пролетят мимо фасада. Приходится вызывать здесь.
 					 * Вызов здесь безопасен, поскольку хэндлер уже внес изменения в DOM
 					 */
-
 					if (e.inputType === 'insertText') {
 						props.value.input({
 							type: 'insertText',

@@ -106,7 +106,6 @@ export class InputAction<D extends IInputActionData = IInputActionData>
 	isInsertText(): this is InputAction<IInsertTextActionData> {
 		return this.data.type === 'insertText';
 	}
-
 	isInsertParagraph(): this is InputAction<IInsertParagraphActionData> {
 		return this.data.type === 'insertParagraph';
 	}

@@ -5,10 +5,10 @@ import {
 	IWidgetFacade,
 	Position,
 } from 'types';
-import correctChildIndexes from './correctChildIndexes';
+import correctSmartIndexes from './correctSmartIndexes';
 import getWFByPath from './getWFByPath';
 import cloneSmartPathOfTargetAndIncrementIfNeed from './incrementSmartPath';
-import splitChildrenByPosition from './splitChildrenByPosition';
+import { splitChildrenByTarget } from './split';
 
 export default function addWidget(
 	frameFacade: IFrameFacade,
@@ -16,27 +16,27 @@ export default function addWidget(
 	position: Position,
 	sample: IWidget
 ): void {
+	const parentPath = target.path.slice(0, -1);
+	const parent = getWFByPath(frameFacade, parentPath);
+
 	const smartPathForNewElement = cloneSmartPathOfTargetAndIncrementIfNeed(
 		target as IWidgetFacade,
 		position === 'after'
 	);
-
-	const parentPath = target.path.slice(0, -1);
-	const parent = getWFByPath(frameFacade, parentPath);
 	const newWidget = frameFacade.widgetFacadeConstructor(
 		sample,
 		smartPathForNewElement,
 		parent.toFrame()
 	) as IWidgetFacade;
 
-	const [leftPart, rightPart] = splitChildrenByPosition(
-		frameFacade,
+	const [leftPart, rightPart] = splitChildrenByTarget(
+		parent.children,
 		target as IWidgetFacade,
 		position
 	);
 
 	const newChildren = [...leftPart, newWidget, ...rightPart];
-	correctChildIndexes(rightPart, leftPart.length + 1);
+	correctSmartIndexes(rightPart, leftPart.length + 1);
 
 	parent.children = newChildren;
 }

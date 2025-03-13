@@ -5,6 +5,7 @@ import {
 } from 'types';
 import { insertTextPlain as insertTextInner } from 'utils';
 import BaseFacade from './BaseFacade';
+import { Accessor, Signal, createSignal } from 'solid-js';
 
 export default class PlainTextFacade
 	extends BaseFacade<{}>
@@ -21,17 +22,33 @@ export default class PlainTextFacade
 	}
 	private set text(newText: string) {
 		this._text = newText;
+		if (this._textSignal) {
+			this._textSignal[1](newText);
+		}
 	}
 
 	private _text: string;
+	private _textSignal: Signal<string>;
 
 	constructor(cfg: IPlainTextFacadeCfg) {
 		super(cfg);
 		this.text = cfg.text;
 	}
 
+	_createTextSignal(): Accessor<string> {
+		if (!this._textSignal) {
+			this._textSignal = createSignal(this._text);
+		}
+
+		return this._textSignal[0];
+	}
+
 	insertText(insertText: string, startIndex: number, endIndex?: number): void {
-		this.text = insertTextInner(this.text, insertText, startIndex, endIndex);
+		this._text = insertTextInner(this.text, insertText, startIndex, endIndex);
+	}
+
+	insertTextForce(...args: Parameters<typeof this.insertText>): void {
+		this.text = insertTextInner(this.text, ...args);
 	}
 
 	toFrame(): string {

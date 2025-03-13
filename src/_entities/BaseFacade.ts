@@ -31,6 +31,9 @@ export default abstract class BaseFacade<Properties extends IProperties = {}>
 	get smartPath(): SmartPath {
 		return this._path;
 	}
+	set smartPath(newSmartPath: SmartPath) {
+		this._path = newSmartPath;
+	}
 	get children(): IBaseFacade[] {
 		return this._children;
 	}
@@ -41,7 +44,7 @@ export default abstract class BaseFacade<Properties extends IProperties = {}>
 	}
 
 	private readonly _bubbleEvent: BubbleEventFunc;
-	private readonly _path: SmartPath;
+	private _path: SmartPath;
 	private _children: IBaseFacade[];
 
 	constructor({

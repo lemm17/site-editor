@@ -1,7 +1,7 @@
 export { default as createUUID } from './_utils/uuid';
 export {
 	default as constructFrameFacade,
-	createWidgetFacadeConstructor,
+	createWidgetFacadeConstructors,
 } from './_utils/constructFrameFacade';
 export { default as createBubbleEventFunc } from './_utils/createBubbleEventFunc';
 export {
@@ -21,13 +21,14 @@ export { default as CFDFSTraverse } from './_utils/CFDFSTraverse';
 export { isTextNode } from './_utils/selection/textNodes';
 export { default as isPlainTextFacade } from './_utils/plainTextActions/isPlainTextFacade';
 export { default as insertTextPlain } from './_utils/plainTextActions/insertText';
-export { default as correctChildIndexes } from './_utils/actions/correctChildIndexes';
+export { default as correctSmartIndexes } from './_utils/actions/correctSmartIndexes';
 export { default as getEdgesInfo } from './_utils/actions/getEdgesInfo';
 export { default as insertTextCrossWidget } from './_utils/actions/insertTextCrossWidget';
 export { default as getWFByPath } from './_utils/actions/getWFByPath';
-export { default as splitChildrenByPosition } from './_utils/actions/splitChildrenByPosition';
+export { splitChildrenByTarget } from './_utils/actions/split';
 export { default as cloneSmartPathOfTargetAndIncrementIfNeed } from './_utils/actions/incrementSmartPath';
 export { default as highlightJSON } from './_utils/highlightJSON';
 export { default as deleteContent } from './_utils/actions/deleteContent';
 export { default as insertText } from './_utils/actions/insertText';
 export { default as addWidget } from './_utils/actions/addWidget';
+export { default as insertParagraph } from './_utils/actions/insertParagraph';

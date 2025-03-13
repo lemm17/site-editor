@@ -6,6 +6,7 @@ import {
 	ITextWidgetFacade,
 	ACTION,
 	IInputActionData,
+	ITextProps,
 } from 'types';
 import { DEFAULT_EMOJI } from './EmojiFacade';
 
@@ -25,8 +26,8 @@ export default class TextFacade
 		this._notify(insertTextAction);
 	}
 
-	static sample: IWidget<IEmojiProps> = [
-		WIDGETS.emoji,
+	static sample: IWidget<ITextProps> = [
+		WIDGETS.text,
 		{ value: DEFAULT_EMOJI },
 	];
 }

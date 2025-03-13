@@ -2,11 +2,13 @@ import {
 	CFDFSTraverse,
 	constructFrameFacade,
 	createBubbleEventFunc,
-	createWidgetFacadeConstructor,
+	createWidgetFacadeConstructors,
 	toFrame,
 	deleteContent,
 	insertText,
 	addWidget,
+	insertParagraph,
+	ChildrenSetter,
 } from 'utils';
 import {
 	IFrame,
@@ -28,12 +30,29 @@ import {
 	IInsertParagraphActionData,
 	IDeleteContentBackwardActionData,
 	IDeleteContentForwardActionData,
+	WidgetFacadeCreator,
+	IBaseFacade,
 } from 'types';
 import { AddAction, InputAction } from './Action';
 
 export default class FrameFacade implements IFrameFacade {
-	readonly children: IWidgetFacade[];
 	readonly widgetFacadeConstructor: WidgetFacadeConstructor;
+	readonly widgetFacadeCreator: WidgetFacadeCreator;
+
+	// -----
+	// TODO
+	// Копипаста из BaseFacade
+	// Эта логика должна быть в базовом классе Facade
+	get children(): IWidgetFacade[] {
+		return this._children;
+	}
+	set children(newChildren: IWidgetFacade[]) {
+		const setter = ChildrenSetter.getSetter(this._children);
+		setter(newChildren);
+		this._children = newChildren;
+	}
+	private _children: IWidgetFacade[];
+	// -----
 
 	get path(): Path {
 		return [];
@@ -56,14 +75,13 @@ export default class FrameFacade implements IFrameFacade {
 		onAction: <T extends ACTION, D>(action: IAction<T, D>) => void
 	) {
 		const bubbleEvent = createBubbleEventFunc(this);
-		const widgetFacadeConstructor = createWidgetFacadeConstructor(
-			bubbleEvent,
-			facadeMap
-		);
-		this.children = constructFrameFacade(frame, widgetFacadeConstructor);
+		const [widgetFacadeConstructor, widgetFacadeCreator] =
+			createWidgetFacadeConstructors(bubbleEvent, facadeMap);
+		this._children = constructFrameFacade(frame, widgetFacadeConstructor);
 		this._bubbleEvent = bubbleEvent;
 		this._facadeMap = facadeMap;
 		this.widgetFacadeConstructor = widgetFacadeConstructor;
+		this.widgetFacadeCreator = widgetFacadeCreator;
 		this._onAction = onAction;
 	}
 
@@ -130,7 +148,20 @@ export default class FrameFacade implements IFrameFacade {
 	private _onInsertParagraph(
 		action: IInputAction<IInsertParagraphActionData>
 	): void {
-		return;
+		const newText = insertParagraph(
+			action.target,
+			this,
+			action.data.selection
+		);
+		const focusCallback = this._focusCallbackMap.get(newText);
+		if (focusCallback) {
+			focusCallback({
+				anchor: 0,
+				focus: 0,
+				offset: null,
+				direction: 'right',
+			});
+		}
 	}
 
 	private _onInsertText(action: IInputAction<IInsertTextActionData>): void {

@@ -1,8 +1,8 @@
-import { IWidgetFacade, SmartIndex, SmartPath } from 'types';
+import { IBaseFacade, SmartIndex, SmartPath } from 'types';
 
 export default function cloneSmartPathOfTargetAndIncrementIfNeed(
-	target: IWidgetFacade,
-	increment: boolean
+	target: IBaseFacade,
+	increment: boolean = true
 ): SmartPath {
 	const targetIndexInParent = target.path.at(-1);
 
