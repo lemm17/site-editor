@@ -13,12 +13,11 @@ export default function deleteContent(
 		const startIndex = edgesInfo.startIndexRelativeToStartChild;
 		const endIndex = edgesInfo.endIndexRelativeToEndChild;
 		const isCollapsed = startIndex === endIndex;
-		const modifier: -1 | 1 = backward ? -1 : 1;
 
 		edgesInfo.startChild.insertText(
 			'',
-			isCollapsed ? startIndex + modifier : startIndex,
-			edgesInfo.endIndexRelativeToEndChild
+			isCollapsed && backward ? startIndex - 1 : startIndex,
+			isCollapsed && !backward ? endIndex + 1 : endIndex
 		);
 	} else {
 		const newChildren = insertTextCrossWidget(target, '', edgesInfo);
