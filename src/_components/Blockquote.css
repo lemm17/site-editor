@@ -1,0 +1,16 @@
+blockquote {
+    position: relative;
+    margin: 0;
+}
+
+.blockquote-padding {
+    padding: 16px 40px;
+}
+
+blockquote:before {
+    position: absolute;
+    content: '';
+    width: 2px;
+    height: 100%;
+    background-color: black;
+}

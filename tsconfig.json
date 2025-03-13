@@ -1,0 +1,24 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.node.json" }
+  ],
+  "compilerOptions": {
+    "target": "ES6",
+    "baseUrl": "./",
+    "paths": {
+      "types": ["src/types.ts"],
+      "entities": ["src/entities.ts"],
+      "components": ["src/components.ts"],
+      "utils": ["src/utils.ts"],
+      "widgets": ["src/widgets.ts"],
+      "@/*": ["src/*"]
+    },
+    "types": ["jest"],
+    "lib": ["es2022", "dom"]
+  },
+  "rules": {
+    "@typescript-eslint/no-shadow": "error"
+  },
+}
