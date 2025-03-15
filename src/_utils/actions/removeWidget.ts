@@ -19,9 +19,32 @@ export default function removeWidget(
 	const parent = isFrameFacade(frameFacadeOrParent)
 		? getParent(target, frameFacadeOrParent)
 		: frameFacadeOrParent;
+	const newChildren = getParentChildrenWithoutTargetAndCorrectIndexes(
+		target,
+		parent
+	);
+
+	parent.children = newChildren;
+}
+
+export function getParentChildrenWithoutTargetAndCorrectIndexes(
+	target: IBaseFacade,
+	frameFacade: IFrameFacade
+): IBaseFacade[];
+export function getParentChildrenWithoutTargetAndCorrectIndexes(
+	target: IBaseFacade,
+	parent: IWidgetFacade
+): IBaseFacade[];
+export function getParentChildrenWithoutTargetAndCorrectIndexes(
+	target: IBaseFacade,
+	frameFacadeOrParent: IFrameFacade | IWidgetFacade
+): IBaseFacade[] {
+	const parent = isFrameFacade(frameFacadeOrParent)
+		? getParent(target, frameFacadeOrParent)
+		: frameFacadeOrParent;
 	const [leftPart, rightPart] = splitChildrenByTarget(parent.children, target);
 	correctSmartIndexes(rightPart, leftPart.length);
 	const newChildren = [...leftPart, ...rightPart];
 
-	parent.children = newChildren;
+	return newChildren;
 }

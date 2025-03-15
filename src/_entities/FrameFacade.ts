@@ -144,37 +144,32 @@ export default class FrameFacade implements IFrameFacade {
 		} else if (action.isDeleteContentForward()) {
 			this._onDeleteContentForward(action);
 		} else if (action.isMergeContentBackward()) {
-			this._onMergeContentBackward(action);
+			this._onMergeContent(action, false);
 		} else if (action.isMergeContentForward()) {
-			this._onMergeContentForward(action);
+			this._onMergeContent(action, true);
 		}
 	}
 
-	private _onMergeContentForward(
-		action: IInputAction<IMergeContentForwardActionData>
+	private _onMergeContent(
+		action: IInputAction<IMergeContentBackwardActionData>,
+		forward: false
+	): void;
+	private _onMergeContent(
+		action: IInputAction<IMergeContentForwardActionData>,
+		forward: true
+	): void;
+	private _onMergeContent(
+		action:
+			| IInputAction<IMergeContentBackwardActionData>
+			| IInputAction<IMergeContentForwardActionData>,
+		forward: boolean
 	): void {
-		mergeText(action.target, this, true);
-		this._applyFocus(action.target, action.data.selection);
-	}
+		const [textFacade, offset] = mergeText(action.target, this, forward);
 
-	private _onMergeContentBackward(
-		action: IInputAction<IMergeContentBackwardActionData>
-	): void {
-		let textLengthOfFoundedElementBeforeMerging = null;
-		let foundedElement: ITextWidgetFacade = null;
-
-		mergeText(action.target, this, false, (mergedTextFacade) => {
-			textLengthOfFoundedElementBeforeMerging = mergedTextFacade.length;
-			foundedElement = mergedTextFacade;
-		});
-
-		if (
-			typeof textLengthOfFoundedElementBeforeMerging === 'number' &&
-			foundedElement
-		) {
-			this._applyFocus(foundedElement, {
-				anchor: textLengthOfFoundedElementBeforeMerging,
-				focus: textLengthOfFoundedElementBeforeMerging,
+		if (textFacade && typeof offset === 'number') {
+			this._applyFocus(textFacade, {
+				anchor: offset,
+				focus: offset,
 				direction: null,
 				offset: null,
 			});
