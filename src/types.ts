@@ -49,7 +49,7 @@ export interface IAction<
 
 export interface IAddAction
 	extends IAction<ACTION.ADD, IAddActionData, IBaseFacade> {
-	getSample(facadeMap: Record<WIDGETS, IWidgetFacadeConstructor>): IWidget;
+	getSample(facadeMap: IWidgetFacadeMap): IWidget;
 }
 export interface IAddActionDataByWidget {
 	position: Position;
@@ -86,7 +86,9 @@ export interface IBaseInputActionData {
 		| 'insertText'
 		| 'insertParagraph'
 		| 'deleteContentBackward'
-		| 'deleteContentForward';
+		| 'deleteContentForward'
+		| 'mergeContentBackward'
+		| 'mergeContentForward';
 	timeStamp: number;
 	selection: ISelection;
 }
@@ -103,17 +105,27 @@ export interface IDeleteContentBackwardActionData extends IBaseInputActionData {
 export interface IDeleteContentForwardActionData extends IBaseInputActionData {
 	type: 'deleteContentForward';
 }
+export interface IMergeContentBackwardActionData extends IBaseInputActionData {
+	type: 'mergeContentBackward';
+}
+export interface IMergeContentForwardActionData extends IBaseInputActionData {
+	type: 'mergeContentForward';
+}
 export type IInputActionData =
 	| IInsertTextActionData
 	| IInsertParagraphActionData
 	| IDeleteContentBackwardActionData
-	| IDeleteContentForwardActionData;
+	| IDeleteContentForwardActionData
+	| IMergeContentBackwardActionData
+	| IMergeContentForwardActionData;
 export interface IInputAction<D extends IInputActionData = IInputActionData>
 	extends IAction<ACTION.INPUT, D, ITextWidgetFacade> {
 	isInsertText(): this is IInputAction<IInsertTextActionData>;
 	isInsertParagraph(): this is IInputAction<IInsertParagraphActionData>;
 	isDeleteContentBackward(): this is IInputAction<IDeleteContentBackwardActionData>;
 	isDeleteContentForward(): this is IInputAction<IDeleteContentForwardActionData>;
+	isMergeContentBackward(): this is IInputAction<IMergeContentBackwardActionData>;
+	isMergeContentForward(): this is IInputAction<IMergeContentForwardActionData>;
 }
 export type IInputActionParams = IActionParams<
 	IInputActionData,
@@ -127,14 +139,25 @@ export interface IBaseFacadeCfg<Properties extends IProperties = {}> {
 	properties: Properties;
 	children: IBaseFacade[];
 	bubbleEvent: BubbleEventFunc;
+	widgetFacadeCreator: WidgetFacadeCreator;
+	widgetFacadeMap: IWidgetFacadeMap;
 }
 
 export interface IWidgetFacadeCfg<Properties extends IProperties = {}>
 	extends IBaseFacadeCfg<Properties> {
 	type: WIDGETS;
-	properties: Properties;
-	children: IBaseFacade[];
 }
+
+export interface ITextWidgetFacadeCfg extends IBaseFacadeCfg<ITextProps> {
+	type: WIDGETS.text;
+}
+
+export type IWidgetFacadeMap = {
+	[WIDGETS.text]: ITextWidgetFacadeConstructor;
+	[PLAIN_TEXT_FACADE_TYPE]: IPlainTextFacadeConstructor;
+} & {
+	[K in Exclude<keyof typeof WIDGETS, 'text'>]: IWidgetFacadeConstructor;
+};
 
 export interface IPlainTextFacadeCfg extends IBaseFacadeCfg<{}> {
 	properties: {};
@@ -145,6 +168,9 @@ export interface IPlainTextFacadeCfg extends IBaseFacadeCfg<{}> {
 
 export interface IFacade<T extends IFacade<T>> {
 	children: T[];
+	readonly widgetFacadeCreator: WidgetFacadeCreator;
+	readonly widgetFacadeMap: IWidgetFacadeMap;
+	readonly bubbleEvent: BubbleEventFunc;
 
 	get path(): Path;
 
@@ -154,7 +180,7 @@ export interface IFacade<T extends IFacade<T>> {
 	toFrame(): IWidget | IFrame | string;
 }
 
-export const PLAIN_TEXT_FACADE_TYPE = 'plainText';
+export const PLAIN_TEXT_FACADE_TYPE = 'plainText' as const;
 
 export interface IBaseFacade<Properties extends IProperties = {}>
 	extends IFacade<IBaseFacade> {
@@ -162,7 +188,8 @@ export interface IBaseFacade<Properties extends IProperties = {}>
 	readonly type: WIDGETS | typeof PLAIN_TEXT_FACADE_TYPE;
 	readonly properties: Properties;
 
-	add(addActionData: IAddActionData): void;
+	add(addActionData: IAddActionData, initiator?: IBaseFacade): void;
+	remove(initiator?: IBaseFacade): void;
 	toFrame(): IWidget | string;
 }
 
@@ -174,11 +201,14 @@ export interface IWidgetFacade<Properties extends IProperties = {}>
 	toFrame(): IWidget;
 }
 
-export interface ITextWidgetFacade<Properties extends IProperties = {}>
-	extends IWidgetFacade<Properties> {
+export interface ITextWidgetFacade extends IWidgetFacade<ITextProps> {
 	readonly type: WIDGETS.text;
+	readonly length: number;
 
 	input(data: IInputActionData): void;
+
+	// Только для использования в реализации компонента текст.
+	_setContainer(container: HTMLElement): void;
 }
 
 export interface IPlainTextFacade extends IBaseFacade {
@@ -208,6 +238,17 @@ export interface IWidgetFacadeConstructor<Properties extends IProperties = {}> {
 	sample: IWidget;
 }
 
+export interface ITextWidgetFacadeConstructor {
+	new (cfg: ITextWidgetFacadeCfg): ITextWidgetFacade;
+
+	// static
+	sample: ITextWidget;
+}
+
+export interface IPlainTextFacadeConstructor {
+	new (cfg: IPlainTextFacadeCfg): IPlainTextFacade;
+}
+
 export type IWidgetChild = IWidget | ITextWidget;
 
 export interface ITextWidgetProps {}
@@ -232,8 +273,8 @@ export type IFrame = ['frame', {}, ...IWidget[]];
 export type FocusCallback = (selection: ISelection) => void;
 
 export interface IFrameFacade extends IFacade<IBaseFacade> {
+	readonly isFrameFacade: true;
 	readonly widgetFacadeConstructor: WidgetFacadeConstructor;
-	readonly widgetFacadeCreator: WidgetFacadeCreator;
 
 	children: IWidgetFacade[];
 
@@ -337,9 +378,9 @@ export interface IWidgetComponentProps<T extends object = {}> {
 	children?: JSXElement;
 }
 
-export interface ITextWidgetComponentProps<T extends object = {}>
-	extends IWidgetComponentProps<T> {
-	value: ITextWidgetFacade<T>;
+export interface ITextWidgetComponentProps
+	extends IWidgetComponentProps<ITextProps> {
+	value: ITextWidgetFacade;
 }
 
 export const INLINE_WIDGET_OFFSET_LENGTH = 1;
@@ -352,21 +393,27 @@ export interface IEmojiProps {
 	value: string;
 }
 
+export const TEXT_WIDGET_CLASS_NAME = 'text-widget';
+
 export interface ITextProps {}
 
-export type WidgetFacadeConstructor = <P extends object = {}>(
+export type WidgetFacadeConstructor = <P extends IProperties = {}>(
 	widget: IWidget<P>,
 	path: SmartPath,
 	parent: IWidget
-) => IBaseFacade<P> | IPlainTextFacade;
+) => ReturnType<WidgetFacadeCreator>;
 
-export type WidgetFacadeCreator = <P extends object = {}>(
-	type: WIDGETS | typeof PLAIN_TEXT_FACADE_TYPE,
+export type WidgetFacadeCreator = (
+	type: keyof typeof WIDGETS | typeof PLAIN_TEXT_FACADE_TYPE,
 	path: SmartPath,
-	properties: P,
+	properties: IProperties | ITextProps | {},
 	children: IBaseFacade[],
 	text?: string
-) => IBaseFacade<P> | IPlainTextFacade;
+) => typeof type extends typeof PLAIN_TEXT_FACADE_TYPE
+	? IPlainTextFacade
+	: typeof type extends WIDGETS.text
+		? ITextWidgetFacade
+		: IBaseFacade<IProperties>;
 
 export interface IEdgesInfo {
 	startChild: IPlainTextFacade;

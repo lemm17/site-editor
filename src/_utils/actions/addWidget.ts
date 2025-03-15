@@ -6,7 +6,7 @@ import {
 	Position,
 } from 'types';
 import correctSmartIndexes from './correctSmartIndexes';
-import getWFByPath from './getWFByPath';
+import getParent from './getParent';
 import cloneSmartPathOfTargetAndIncrementIfNeed from './incrementSmartPath';
 import { splitChildrenByTarget } from './split';
 
@@ -16,8 +16,7 @@ export default function addWidget(
 	position: Position,
 	sample: IWidget
 ): void {
-	const parentPath = target.path.slice(0, -1);
-	const parent = getWFByPath(frameFacade, parentPath);
+	const parent = getParent(target, frameFacade);
 
 	const smartPathForNewElement = cloneSmartPathOfTargetAndIncrementIfNeed(
 		target as IWidgetFacade,

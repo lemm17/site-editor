@@ -13,12 +13,12 @@ export function getCaretRectAtPosition({
 }
 
 export function getFirstNodeRect(target: HTMLElement): DOMRect {
-	const firstDeepestNode = getDeepestElement(target, 'left');
+	const firstDeepestNode = getDeepestElement(target, 'start');
 	return firstDeepestNode.getClientRects()[0];
 }
 
 export function getLastNodeRect(target: HTMLElement): DOMRect {
-	const lastDeepestNode = getDeepestElement(target, 'right');
+	const lastDeepestNode = getDeepestElement(target, 'end');
 	const lastNodeRects = lastDeepestNode.getClientRects();
 	return lastNodeRects[lastNodeRects.length - 1];
 }

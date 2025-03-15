@@ -1,7 +1,14 @@
-import { ICaretPosition, ICursorInfo, ISelection } from 'types';
+import {
+	ICaretPosition,
+	ICursorInfo,
+	ISelection,
+	ITextWidgetFacade,
+} from 'types';
 import detection from '../detection';
+import { computeSelectionByCaretPosition } from './computeSelection';
 import { getRangeCoords } from './coords';
 import isEmpty from './isEmpty';
+import { default as isEqualSelection } from './isEqual';
 import { getRange, isForwardSelection } from './range';
 import {
 	getCaretRectAtPosition,
@@ -37,10 +44,10 @@ export function getCurrentCaretPosition(): ICaretPosition {
 
 export function getInitialCaretPosition(
 	target: HTMLElement,
-	from: 'left' | 'right'
+	from: 'start' | 'end'
 ): ICaretPosition {
 	const node = getTextNode(target, from);
-	const offset = from === 'right' ? node.textContent.length : 0;
+	const offset = from === 'end' ? node.textContent.length : 0;
 
 	return {
 		node,
@@ -68,27 +75,33 @@ export function setCaret(
 	}
 }
 
-export function getCaretPosition(
+export function getCaretPosition<Params extends Array<unknown>>(
 	target: HTMLElement,
-	selection: ISelection
+	startSearchFrom: 'start' | 'end',
+	searcher: CaretSearcher<Params>,
+	...searcherParams: Params
 ): ICaretPosition {
-	const fromUp = selection.direction === 'down';
-
 	const initialCaretPosition = getInitialCaretPosition(
 		target,
-		fromUp ? 'left' : 'right'
+		startSearchFrom
 	);
 	const extremeCaretPosition = getInitialCaretPosition(
 		target,
-		fromUp ? 'right' : 'left'
+		startSearchFrom === 'end' ? 'start' : 'end'
 	);
-
-	return searchCaretPosition(
+	const searchConfiguration: SearchConfiguration = {
+		startSearchFrom,
 		initialCaretPosition,
 		extremeCaretPosition,
-		selection.offset,
-		fromUp
-	);
+	};
+
+	return searcher(searchConfiguration, ...searcherParams);
+}
+
+interface SearchConfiguration {
+	initialCaretPosition: ICaretPosition;
+	extremeCaretPosition: ICaretPosition;
+	startSearchFrom: 'start' | 'end';
 }
 
 export default function getCaretInfo(target: HTMLElement): ICursorInfo {
@@ -153,7 +166,7 @@ function checkCursorOnLastLine(
 }
 
 function checkCursorOnStart(target: HTMLElement): boolean {
-	const startCaretPosition = getInitialCaretPosition(target, 'left');
+	const startCaretPosition = getInitialCaretPosition(target, 'start');
 	const currentCaretPosition = getCurrentCaretPosition();
 
 	// Особый случай. Почему-то, если выходить стрелкой влево из
@@ -172,18 +185,25 @@ function checkCursorOnStart(target: HTMLElement): boolean {
 }
 
 function checkCursorOnEnd(target: HTMLElement): boolean {
-	const endCaretPosition = getInitialCaretPosition(target, 'right');
+	const endCaretPosition = getInitialCaretPosition(target, 'end');
 	const currentCaretPosition = getCurrentCaretPosition();
 
 	return isEqualCaretPosition(endCaretPosition, currentCaretPosition);
 }
 
-export function searchCaretPosition(
-	initialCaretPosition: ICaretPosition,
-	extremeCaretPosition: ICaretPosition,
-	targetCaretOffset: number,
-	toRight: boolean
-): ICaretPosition {
+type CaretSearcher<Params extends Array<unknown>> = (
+	searchConfiguration: SearchConfiguration,
+	...args: Params
+) => ICaretPosition;
+
+export const searchCaretPositionByOffset: CaretSearcher<[number]> = (
+	searchConfiguration,
+	targetCaretOffset
+) => {
+	const { initialCaretPosition, extremeCaretPosition, startSearchFrom } =
+		searchConfiguration;
+	const toRight = startSearchFrom === 'start';
+
 	// Rect начальной позиции каретки
 	const initialCaretRect = getCaretRectAtPosition(initialCaretPosition);
 
@@ -236,7 +256,47 @@ export function searchCaretPosition(
 	}
 
 	return caretPosition;
-}
+};
+
+/**
+ * TODO:
+ * Функция работает неправильно с не схлопнутым selection'ом.
+ * Фактически сейчас она ожидает, что он схлопнут и только тогда
+ * будет работать корректно. Необходимо исправить и возвращать 2
+ * позиции каретки
+ */
+export const searchCaretPositionBySelection: CaretSearcher<
+	[ISelection, ITextWidgetFacade]
+> = (searchConfiguration, selection, textFacade) => {
+	const { initialCaretPosition, extremeCaretPosition, startSearchFrom } =
+		searchConfiguration;
+	const toRight = startSearchFrom === 'start';
+
+	let caretPosition = initialCaretPosition;
+	while (true) {
+		const caretPositionSelection = computeSelectionByCaretPosition(
+			caretPosition,
+			textFacade
+		);
+
+		if (isEqualSelection(caretPositionSelection, selection)) {
+			break;
+		}
+
+		// Делаем шаг поиска каретки
+		caretPosition = searchCaretPositionStep(caretPosition, toRight);
+		const haveReachedEdge = isEqualCaretPosition(
+			caretPosition,
+			extremeCaretPosition
+		);
+
+		if (haveReachedEdge) {
+			break;
+		}
+	}
+
+	return caretPosition;
+};
 
 const MIN_CHAR_OFFSET = 0;
 

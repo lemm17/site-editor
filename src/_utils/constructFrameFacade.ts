@@ -7,33 +7,30 @@ import {
 	Index,
 	IWidget,
 	IWidgetFacade,
-	IWidgetFacadeConstructor,
-	SmartPath,
 	WIDGETS,
 	PLAIN_TEXT_FACADE_TYPE,
 	IBaseFacade,
 	WidgetFacadeCreator,
+	IWidgetFacadeMap,
 	IPlainTextFacade,
+	SmartPath,
 } from 'types';
-import { PlainTextFacade } from 'entities';
 
 export function createWidgetFacadeConstructors(
 	bubbleEvent: BubbleEventFunc,
-	facadeMap: Record<WIDGETS, IWidgetFacadeConstructor>
+	widgetFacadeMap: IWidgetFacadeMap
 ): [WidgetFacadeConstructor, WidgetFacadeCreator] {
-	const constructWidgetFacade: WidgetFacadeConstructor = <
-		P extends object = {},
-	>(
-		widget: IWidget<P>,
-		path: SmartPath,
-		parent: IWidget
-	): IBaseFacade<P> | IPlainTextFacade => {
+	const constructWidgetFacade: WidgetFacadeConstructor = (
+		widget,
+		path,
+		parent
+	) => {
 		const isParentTextWidget = parent && Frame.isTextWidget(parent);
 		if (isParentTextWidget && typeof widget === 'string') {
-			return createWidgetFacade(
+			return widgetFacadeCreator(
 				PLAIN_TEXT_FACADE_TYPE,
 				path,
-				{} as P,
+				{},
 				[],
 				widget
 			);
@@ -54,41 +51,52 @@ export function createWidgetFacadeConstructors(
 		const name = Frame.getName(widget);
 		const props = Frame.getProps(widget);
 
-		return createWidgetFacade(name, path, props, childrenFacades);
+		return widgetFacadeCreator(name, path, props, childrenFacades);
 	};
 
-	const createWidgetFacade: WidgetFacadeCreator = <P extends object = {}>(
-		type: WIDGETS | typeof PLAIN_TEXT_FACADE_TYPE,
-		path: SmartPath,
-		properties: P,
-		children: IBaseFacade[],
-		text: string = ''
+	const widgetFacadeCreator: WidgetFacadeCreator = (
+		type,
+		path,
+		properties,
+		children,
+		text
 	) => {
 		if (type === PLAIN_TEXT_FACADE_TYPE) {
-			return new PlainTextFacade({
+			return createPlainTextFacade(
+				widgetFacadeMap,
+				path,
+				widgetFacadeCreator,
+				bubbleEvent,
+				text
+			);
+		}
+
+		if (type === WIDGETS.text) {
+			return new widgetFacadeMap[type]({
 				id: createUUID(),
 				path,
-				type: PLAIN_TEXT_FACADE_TYPE,
-				properties: {} as P,
-				children: [],
+				type: WIDGETS.text,
+				properties: {},
+				children,
 				bubbleEvent,
-				text,
+				widgetFacadeMap,
+				widgetFacadeCreator,
 			});
 		}
 
-		const Facade = facadeMap[WIDGETS[type]] as IWidgetFacadeConstructor<P>;
-
-		return new Facade({
+		return new widgetFacadeMap[type]({
 			id: createUUID(),
 			path,
-			type,
+			type: WIDGETS[type],
 			properties,
 			children,
 			bubbleEvent,
+			widgetFacadeCreator,
+			widgetFacadeMap,
 		});
 	};
 
-	return [constructWidgetFacade, createWidgetFacade];
+	return [constructWidgetFacade, widgetFacadeCreator];
 }
 
 export default function constructFrameFacade(
@@ -102,4 +110,24 @@ export default function constructFrameFacade(
 	return Frame.getChildren(frame).map((widget: IWidget, index: Index) => {
 		return widgetFacadeConstructor(widget, [[index]], null);
 	}) as IWidgetFacade[];
+}
+
+export function createPlainTextFacade(
+	widgetFacadeMap: IWidgetFacadeMap,
+	path: SmartPath,
+	widgetFacadeCreator: WidgetFacadeCreator,
+	bubbleEvent: BubbleEventFunc,
+	text = ''
+): IPlainTextFacade {
+	return new widgetFacadeMap[PLAIN_TEXT_FACADE_TYPE]({
+		id: createUUID(),
+		path,
+		type: PLAIN_TEXT_FACADE_TYPE,
+		properties: {},
+		children: [],
+		bubbleEvent,
+		text,
+		widgetFacadeMap,
+		widgetFacadeCreator,
+	});
 }

@@ -28,6 +28,9 @@ import {
 	IWidget,
 	WIDGETS,
 	IWidgetFacadeConstructor,
+	IWidgetFacadeMap,
+	IMergeContentForwardActionData,
+	IMergeContentBackwardActionData,
 } from 'types';
 
 export abstract class Action<
@@ -69,7 +72,7 @@ export class AddAction
 	extends Action<ACTION.ADD, IAddActionData, IWidgetFacade>
 	implements IAddAction
 {
-	getSample(facadeMap: Record<WIDGETS, IWidgetFacadeConstructor>): IWidget {
+	getSample(facadeMap: IWidgetFacadeMap): IWidget {
 		if ('sample' in this.data) {
 			return this.data.sample;
 		}
@@ -114,6 +117,12 @@ export class InputAction<D extends IInputActionData = IInputActionData>
 	}
 	isDeleteContentForward(): this is InputAction<IDeleteContentForwardActionData> {
 		return this.data.type === 'deleteContentForward';
+	}
+	isMergeContentBackward(): this is IInputAction<IMergeContentBackwardActionData> {
+		return this.data.type === 'mergeContentBackward';
+	}
+	isMergeContentForward(): this is IInputAction<IMergeContentForwardActionData> {
+		return this.data.type === 'mergeContentForward';
 	}
 }
 

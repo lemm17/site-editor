@@ -15,9 +15,9 @@ export function getTextNodes(parentNode: HTMLElement): Text[] {
 
 export function getTextNode(
 	element: HTMLElement,
-	from: 'left' | 'right'
+	from: 'start' | 'end'
 ): Text | Node {
-	const accesorName = from === 'left' ? 'firstChild' : 'lastChild';
+	const accesorName = from === 'start' ? 'firstChild' : 'lastChild';
 	let current = element as Node;
 
 	while (current[accesorName]) {
@@ -62,13 +62,13 @@ export function getSiblingTextNode(
 
 	return getTextNode(
 		resultNode as HTMLElement,
-		isNextSibling ? 'left' : 'right'
+		isNextSibling ? 'start' : 'end'
 	);
 }
 
 export function getDeepestElement(
 	node: HTMLElement,
-	from: 'left' | 'right'
+	from: 'start' | 'end'
 ): HTMLElement {
 	const textNode = getTextNode(node, from);
 
@@ -79,6 +79,6 @@ export function getDeepestElement(
 	return textNode as HTMLElement;
 }
 
-export function getParentIfText(node: HTMLElement | Text): HTMLElement {
-	return isTextNode(node) ? node.parentElement : node;
+export function getParentIfText(node: HTMLElement | Node): HTMLElement {
+	return isTextNode(node) ? node.parentElement : (node as HTMLElement);
 }

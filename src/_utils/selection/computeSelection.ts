@@ -1,4 +1,5 @@
 import {
+	ICaretPosition,
 	IDirection,
 	INLINE_WIDGET_OFFSET_LENGTH,
 	IPlainTextFacade,
@@ -17,7 +18,7 @@ import { getParentIfText } from './textNodes';
 export default function computeSelection(
 	textFacade: ITextWidgetFacade,
 	target: HTMLElement,
-	direction: IDirection,
+	direction: IDirection = null,
 	offset: number = computeOffset(getRange())
 ): ISelection | never {
 	const selection = document.getSelection();
@@ -97,7 +98,13 @@ export default function computeSelection(
 
 		if (!focusFinish) {
 			if (focusId === child.id) {
-				focus += selection.focusOffset;
+				if (selection.focusNode.textContent !== '\u200b') {
+					// Игнорируем смещение пустого символа, его нет в данных
+					focus += selection.focusOffset;
+				} else if (selection.focusNode.textContent.length > 1) {
+					throw new Error('hueta kakayato');
+				}
+
 				focusFinish = true;
 			} else {
 				focus += (child as IPlainTextFacade).text.length;
@@ -106,7 +113,13 @@ export default function computeSelection(
 
 		if (!anchorFinish) {
 			if (anchorId === child.id) {
-				anchor += selection.anchorOffset;
+				if (selection.anchorNode.textContent !== '\u200b') {
+					// Игнорируем смещение пустого символа, его нет в данных
+					anchor += selection.anchorOffset;
+				} else if (selection.anchorNode.textContent.length > 1) {
+					throw new Error('hueta kakayato');
+				}
+
 				anchorFinish = true;
 			} else {
 				anchor += (child as IPlainTextFacade).text.length;
@@ -122,6 +135,69 @@ export default function computeSelection(
 	};
 }
 
+export function computeSelectionByCaretPosition(
+	caretPosition: ICaretPosition,
+	textFacade: ITextWidgetFacade
+): ISelection {
+	const element = getParentIfText(caretPosition.node);
+	const elementId = element?.id;
+	if (!elementId) {
+		throw new Error(`Didn't find id on plain text element ${element}`);
+	}
+
+	let textOffset = 0;
+	for (const child of textFacade.children) {
+		if (child.type !== PLAIN_TEXT_FACADE_TYPE) {
+			textOffset += INLINE_WIDGET_OFFSET_LENGTH;
+			continue;
+		}
+
+		if (elementId === child.id) {
+			if (element.textContent !== '\u200b') {
+				// Игнорируем смещение пустого символа, его нет в данных
+				textOffset += caretPosition.offset;
+			} else if (element.textContent.length > 1) {
+				throw new Error('hueta kakayato');
+			}
+
+			break;
+		} else {
+			textOffset += (child as IPlainTextFacade).text.length;
+		}
+	}
+
+	return {
+		anchor: textOffset,
+		focus: textOffset,
+		direction: null,
+		offset: null,
+	};
+}
+
 export function computeOffset(range: Range = getRange()): number {
 	return getCoords(range, isForwardSelection(range)).x;
+}
+
+export function facadeContainsSelection(
+	textFacade: ITextWidgetFacade
+): boolean {
+	const range = getRange();
+
+	if (!range) {
+		throw new Error('There are no any ranges in selection');
+	}
+
+	if (!range.commonAncestorContainer) {
+		throw new Error('No commonAncestorContainer in selection range');
+	}
+
+	let current = range.commonAncestorContainer.parentElement;
+	while (current) {
+		if (current.getAttribute('data-inline') === 'false') {
+			return current.id === textFacade.id;
+		}
+		current = current.parentElement;
+	}
+
+	return false;
 }

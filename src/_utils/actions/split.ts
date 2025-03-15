@@ -13,12 +13,25 @@ import correctSmartIndexes from './correctSmartIndexes';
 import getEdgesInfo from './getEdgesInfo';
 import cloneSmartPathOfTargetAndIncrementIfNeed from './incrementSmartPath';
 
+/**
+ * Разбивает дочерние виджеты на 2 части по таргету.
+ * Таргет остается либо в левой, либо в правой, в зависимости от позиции.
+ * Если позиция не указана, таргет не включается в результат.
+ */
 export function splitChildrenByTarget(
 	children: IBaseFacade[],
 	target: IBaseFacade,
-	position: Position
+	position: Position = null
 ): [IBaseFacade[], IBaseFacade[]] {
 	const targetIndexInParent = target.path.at(-1);
+
+	if (!position) {
+		const rightPart = children.slice(targetIndexInParent + 1);
+		const leftPart = children.slice(0, targetIndexInParent);
+
+		return [leftPart, rightPart];
+	}
+
 	const rightPart =
 		position === 'before'
 			? children.slice(targetIndexInParent)

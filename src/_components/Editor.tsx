@@ -1,4 +1,4 @@
-import { children, For, Show, onMount, createSignal } from 'solid-js';
+import { children, For, Show, onMount } from 'solid-js';
 import {
 	WIDGETS,
 	IWidgetComponentProps,
@@ -89,26 +89,31 @@ function ComponentWrapper<T extends object = {}>(
 				class={RENDER_CLASS}
 				// Если вставить false как boolean, SolidJS его вырежет
 				contentEditable={'false' as unknown as boolean}
+				id={value.id}
+				data-inline={'true'}
 			>
 				<Component value={value}>{resolvedChildren()}</Component>
 			</span>
 		);
 	}
 
-	// Костыль
 	if (isPlainTextFacade(value as unknown as IPlainTextFacade)) {
 		const plainTextFacade = value as unknown as IPlainTextFacade;
 		const getText = plainTextFacade._createTextSignal();
 
 		return (
-			<span class={RENDER_CLASS} id={plainTextFacade.id}>
+			<span
+				class={RENDER_CLASS}
+				data-inline={'true'}
+				id={plainTextFacade.id}
+			>
 				{getText()}
 			</span>
 		);
 	}
 
 	return (
-		<div class={RENDER_CLASS}>
+		<div class={RENDER_CLASS} data-inline={'false'} id={value.id}>
 			<Component value={value}>{resolvedChildren()}</Component>
 		</div>
 	);

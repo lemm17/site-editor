@@ -22,8 +22,9 @@ export default class PlainTextFacade
 	}
 	private set text(newText: string) {
 		this._text = newText;
+
 		if (this._textSignal) {
-			this._textSignal[1](newText);
+			this._textSignal[1](newText || '\u200b');
 		}
 	}
 
@@ -37,14 +38,14 @@ export default class PlainTextFacade
 
 	_createTextSignal(): Accessor<string> {
 		if (!this._textSignal) {
-			this._textSignal = createSignal(this._text);
+			this._textSignal = createSignal(this.text || '\u200b');
 		}
 
 		return this._textSignal[0];
 	}
 
 	insertText(insertText: string, startIndex: number, endIndex?: number): void {
-		this._text = insertTextInner(this.text, insertText, startIndex, endIndex);
+		this.text = insertTextInner(this.text, insertText, startIndex, endIndex);
 	}
 
 	insertTextForce(...args: Parameters<typeof this.insertText>): void {

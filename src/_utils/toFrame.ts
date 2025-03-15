@@ -15,14 +15,14 @@ export function widgetToFrame<Properties extends IProperties = {}>(
 	baseFacade: IBaseFacade<Properties>
 ): IWidget<Properties> | string {
 	if (baseFacade instanceof PlainTextFacade) {
-		return baseFacade.text;
+		return baseFacade.text === '\u200b' ? '' : baseFacade.text;
 	}
-	const widgetFacade = baseFacade as IWidgetFacade;
+	const widgetFacade = baseFacade as unknown as IWidgetFacade;
 	const props = widgetFacade.properties;
 
 	const childrensAsFrame = widgetFacade.children.map((child) => {
 		if (child instanceof PlainTextFacade) {
-			return child.text;
+			return child.text === '\u200b' ? '' : child.text;
 		}
 
 		return widgetToFrame(child as IWidgetFacade);

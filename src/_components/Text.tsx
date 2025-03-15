@@ -1,111 +1,150 @@
-import { IDirection, ISelection, ITextWidgetComponentProps } from 'types';
-import { children } from 'solid-js';
+import {
+	IDirection,
+	ISelection,
+	ITextWidgetComponentProps,
+	TEXT_WIDGET_CLASS_NAME,
+} from 'types';
+import { children, onMount } from 'solid-js';
 import { useFocus, useLeaveFocus, useCursorOffset } from 'hook';
 import {
 	applySelection,
 	shouldLetOutCursor,
-	computeSelection as computeSelectionInner,
+	computeSelection,
+	isCollapsed,
 } from 'utils';
 import { keyboardKeyToDirectionMap, resetOffsetKeys } from './Text/constants';
-import {
-	handleExtremeCaseOnArrowKeyDown,
-	handleExtremeCaseOnInsertText,
-	isAllowedInputType,
-} from './Text/helpers';
+import { ignoreZeroWidthSpaceIfNeed, isAllowedInputType } from './Text/helpers';
 
 export interface ITextProps {}
 
-export default function Text(props: ITextWidgetComponentProps<ITextProps>) {
+export default function Text(props: ITextWidgetComponentProps) {
 	const resolvedChildren = children(() => props.children);
 	let ref: HTMLParagraphElement;
 
 	useFocus(props.value, (selection) => {
-		applySelection(ref, selection);
+		applySelection(ref, props.value, selection);
 	});
 	const leaveFocus = useLeaveFocus(props.value);
 	const [computeOffset, resetOffset] = useCursorOffset();
 
-	/**
-	 * Создаем замыкание для использования selection вычисленного
-	 * в onBeforeInput в onInput.
-	 *
-	 * Вычислять selection нужно именно в beforeInput, потому что после мутации DOM
-	 * selection станет неактуальным для операции.
-	 *
-	 * Выполнять action нужно именно в onInput, потому что изменение детей виджета текста через
-	 * сеттер сигнала solid-js вызовет синхронную мутацию в DOM до самого ввода
-	 *
-	 */
-	const [onBeforeInput, onInput] = (() => {
-		// Создаем замыкание для использования selection вычисленного
-		// в onBeforeInput в onInput.
-		// Вычислять нужно именно в beforeInput, потому что после мутации DOM
-		// selection станет неактуальным для операции.
+	const onBeforeInput = (e: InputEvent) => {
+		e.preventDefault();
+		resetOffset();
 
-		let selection: ISelection = null;
+		if (!isAllowedInputType(e.inputType)) {
+			return;
+		}
 
-		const onBeforeInputInner = (e: InputEvent) => {
-			if (!isAllowedInputType(e.inputType)) {
-				e.preventDefault();
+		switch (e.inputType) {
+			case 'insertText':
+				onInsertText(e);
+				return;
+			case 'deleteContentBackward':
+				onDeleteContent(e, true);
+				return;
+			case 'deleteContentForward':
+				onDeleteContent(e, false);
+				return;
+			case 'insertParagraph':
+				onInsertParagraph(e);
+				return;
+		}
+	};
 
-				selection = null;
-			} else {
-				selection = computeSelection();
+	const onInsertParagraph = (e: InputEvent): void => {
+		const selectionBeforeInput = computeSelection(props.value, ref);
 
-				if (e.inputType === 'insertParagraph') {
-					e.preventDefault();
-					props.value.input({
-						type: 'insertParagraph',
-						timeStamp: e.timeStamp,
-						selection,
-					});
-				}
+		props.value.input({
+			type: 'insertParagraph',
+			timeStamp: e.timeStamp,
+			selection: selectionBeforeInput,
+		});
 
-				handleExtremeCaseOnInsertText(e, selection, props.value, () => {
-					/**
-					 * В таком кейсе коллбек вызовется если хэлпер запревентит событие.
-					 * Если это произойдет, onInput не вызовется, а значит, изменения
-					 * пролетят мимо фасада. Приходится вызывать здесь.
-					 * Вызов здесь безопасен, поскольку хэндлер уже внес изменения в DOM
-					 */
-					if (e.inputType === 'insertText') {
-						props.value.input({
-							type: 'insertText',
-							text: e.data,
-							timeStamp: e.timeStamp,
-							selection,
-						});
-					}
-				});
-			}
+		// Постановку курсора в новый параграф делигируем фрейм-фасаду
+	};
 
-			resetOffset();
+	const onDeleteContent = (e: InputEvent, backward: boolean): void => {
+		const forward = !backward;
+		const selectionBeforeInput = computeSelection(props.value, ref);
+		const currentLength = props.value.length;
+
+		const shouldMergeContentBackward =
+			backward &&
+			selectionBeforeInput.anchor === 0 &&
+			selectionBeforeInput.focus === 0;
+		const shouldMergeContentForward =
+			forward &&
+			selectionBeforeInput.anchor === currentLength &&
+			selectionBeforeInput.focus === currentLength;
+
+		if (shouldMergeContentBackward) {
+			props.value.input({
+				type: 'mergeContentBackward',
+				timeStamp: e.timeStamp,
+				selection: selectionBeforeInput,
+			});
+
+			// Делигируем установку курсора в смерженном состоянии фрейм-фасаду
+		} else if (shouldMergeContentForward) {
+			props.value.input({
+				type: 'mergeContentForward',
+				timeStamp: e.timeStamp,
+				selection: selectionBeforeInput,
+			});
+
+			// Делигируем установку курсора в смерженном состоянии фрейм-фасаду
+		} else {
+			const type = backward
+				? 'deleteContentBackward'
+				: 'deleteContentForward';
+			props.value.input({
+				type,
+				timeStamp: e.timeStamp,
+				selection: selectionBeforeInput,
+			});
+
+			const textOffsetModifier = backward ? -1 : 0;
+			const textOffsetAfterInput = isCollapsed(selectionBeforeInput)
+				? selectionBeforeInput.anchor + textOffsetModifier
+				: Math.min(selectionBeforeInput.anchor, selectionBeforeInput.focus);
+
+			const selectionAfterInput = {
+				anchor: textOffsetAfterInput,
+				focus: textOffsetAfterInput,
+				direction: null,
+				offset: null,
+			};
+
+			applySelection(ref, props.value, selectionAfterInput);
+		}
+	};
+
+	const onInsertText = (e: InputEvent): void => {
+		const selectionBeforeInput = computeSelection(props.value, ref);
+		props.value.input({
+			type: 'insertText',
+			timeStamp: e.timeStamp,
+			text: e.data,
+			selection: selectionBeforeInput,
+		});
+
+		const textOffsetAfterInput =
+			Math.min(selectionBeforeInput.anchor, selectionBeforeInput.focus) + 1;
+		const selectionAfterInput: ISelection = {
+			anchor: textOffsetAfterInput,
+			focus: textOffsetAfterInput,
+			direction: null,
+			offset: null,
 		};
-
-		const onInputInner = (e: InputEvent) => {
-			if (isAllowedInputType(e.inputType)) {
-				props.value.input({
-					type: e.inputType,
-					text: e.data,
-					timeStamp: e.timeStamp,
-					selection,
-				});
-			}
-		};
-
-		return [onBeforeInputInner, onInputInner];
-	})();
-
-	const computeSelection = (direction: IDirection = null) => {
-		return computeSelectionInner(props.value, ref, direction);
+		applySelection(ref, props.value, selectionAfterInput);
 	};
 
 	const onKeyDown = (e: KeyboardEvent) => {
-		const key = e.key;
+		ignoreZeroWidthSpaceIfNeed(e);
 
-		if (key in keyboardKeyToDirectionMap) {
-			const direction = keyboardKeyToDirectionMap[key] as IDirection;
-			let selection = computeSelection(direction);
+		if (e.key in keyboardKeyToDirectionMap) {
+			const direction = keyboardKeyToDirectionMap[e.key] as IDirection;
+			let selection = computeSelection(props.value, ref, direction);
 
 			if (shouldLetOutCursor(e, ref)) {
 				e.preventDefault();
@@ -119,23 +158,24 @@ export default function Text(props: ITextWidgetComponentProps<ITextProps>) {
 
 				leaveFocus(selection);
 			}
-
-			// Обработка крайнего случая. См описание функции
-			handleExtremeCaseOnArrowKeyDown(e, selection, props.value, ref);
 		}
 
-		if (resetOffsetKeys.includes(key)) {
+		if (resetOffsetKeys.includes(e.key)) {
 			resetOffset();
 		}
 	};
+
+	onMount(() => {
+		props.value._setContainer(ref);
+	});
 
 	return (
 		<p
 			ref={ref}
 			onKeyDown={onKeyDown}
 			contentEditable={true}
+			class={TEXT_WIDGET_CLASS_NAME}
 			onBeforeInput={onBeforeInput}
-			onInput={onInput}
 		>
 			{resolvedChildren()}
 		</p>

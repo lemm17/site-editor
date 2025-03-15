@@ -2,6 +2,7 @@ export { default as createUUID } from './_utils/uuid';
 export {
 	default as constructFrameFacade,
 	createWidgetFacadeConstructors,
+	createPlainTextFacade,
 } from './_utils/constructFrameFacade';
 export { default as createBubbleEventFunc } from './_utils/createBubbleEventFunc';
 export {
@@ -15,6 +16,7 @@ export { default as applySelection } from './_utils/selection/applySelection';
 export {
 	default as computeSelection,
 	computeOffset,
+	facadeContainsSelection,
 } from './_utils/selection/computeSelection';
 export { default as shouldLetOutCursor } from './_utils/selection/shoudLetOutCursor';
 export { default as CFDFSTraverse } from './_utils/CFDFSTraverse';
@@ -32,3 +34,7 @@ export { default as deleteContent } from './_utils/actions/deleteContent';
 export { default as insertText } from './_utils/actions/insertText';
 export { default as addWidget } from './_utils/actions/addWidget';
 export { default as insertParagraph } from './_utils/actions/insertParagraph';
+export { default as removeWidget } from './_utils/actions/removeWidget';
+export { default as mergeText } from './_utils/actions/mergeText';
+export { normalizedTextChildren } from './_utils/normalize';
+export { default as computeTextLength } from './_utils/computeTextLength';

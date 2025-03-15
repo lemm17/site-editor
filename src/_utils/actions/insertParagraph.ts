@@ -2,7 +2,7 @@ import { IFrameFacade, ISelection, ITextWidgetFacade } from 'types';
 import deepClone from '../deepClone';
 import correctSmartIndexes, { correctParentIndex } from './correctSmartIndexes';
 import getEdgesInfo from './getEdgesInfo';
-import getWFByPath from './getWFByPath';
+import getParent from './getParent';
 import cloneSmartPathOfTargetAndIncrementIfNeed from './incrementSmartPath';
 import { splitChildrenBySelection, splitChildrenByTarget } from './split';
 
@@ -39,8 +39,7 @@ export default function insertParagraph(
 	target.children = leftPart;
 
 	// Получаем родителя исходного текстового виджета
-	const parentPath = target.path.slice(0, -1);
-	const parent = getWFByPath(frameFacade, parentPath);
+	const parent = getParent(target, frameFacade);
 	// Сплитим дочерок исходного текстового виджета, оставляя исходный в левой части
 	const [leftPartOfParent, rightPartOfParent] = splitChildrenByTarget(
 		parent.children,

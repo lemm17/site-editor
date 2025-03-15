@@ -9,13 +9,13 @@ import {
 	addWidget,
 	insertParagraph,
 	ChildrenSetter,
+	mergeText,
+	removeWidget,
 } from 'utils';
 import {
 	IFrame,
 	BubbleEventFunc,
 	IWidgetFacade,
-	WIDGETS,
-	IWidgetFacadeConstructor,
 	IFrameFacade,
 	ACTION,
 	IAction,
@@ -31,13 +31,20 @@ import {
 	IDeleteContentBackwardActionData,
 	IDeleteContentForwardActionData,
 	WidgetFacadeCreator,
-	IBaseFacade,
+	IRemoveAction,
+	IWidgetFacadeMap,
+	IMergeContentForwardActionData,
+	IMergeContentBackwardActionData,
+	ITextWidgetFacade,
 } from 'types';
-import { AddAction, InputAction } from './Action';
+import { AddAction, InputAction, RemoveAction } from './Action';
 
 export default class FrameFacade implements IFrameFacade {
+	readonly isFrameFacade: true = true;
 	readonly widgetFacadeConstructor: WidgetFacadeConstructor;
 	readonly widgetFacadeCreator: WidgetFacadeCreator;
+	readonly widgetFacadeMap: IWidgetFacadeMap;
+	readonly bubbleEvent: BubbleEventFunc;
 
 	// -----
 	// TODO
@@ -61,8 +68,6 @@ export default class FrameFacade implements IFrameFacade {
 		return [];
 	}
 
-	private readonly _bubbleEvent: BubbleEventFunc;
-	private readonly _facadeMap: Record<WIDGETS, IWidgetFacadeConstructor>;
 	private readonly _focusCallbackMap: WeakMap<IWidgetFacade, FocusCallback> =
 		new Map();
 	private readonly _onAction: <T extends ACTION, D>(
@@ -71,17 +76,19 @@ export default class FrameFacade implements IFrameFacade {
 
 	constructor(
 		frame: IFrame,
-		facadeMap: Record<WIDGETS, IWidgetFacadeConstructor>,
+		facadeMap: IWidgetFacadeMap,
 		onAction: <T extends ACTION, D>(action: IAction<T, D>) => void
 	) {
 		const bubbleEvent = createBubbleEventFunc(this);
 		const [widgetFacadeConstructor, widgetFacadeCreator] =
 			createWidgetFacadeConstructors(bubbleEvent, facadeMap);
-		this._children = constructFrameFacade(frame, widgetFacadeConstructor);
-		this._bubbleEvent = bubbleEvent;
-		this._facadeMap = facadeMap;
+
+		this.widgetFacadeMap = facadeMap;
 		this.widgetFacadeConstructor = widgetFacadeConstructor;
 		this.widgetFacadeCreator = widgetFacadeCreator;
+
+		this._children = constructFrameFacade(frame, widgetFacadeConstructor);
+		this.bubbleEvent = bubbleEvent;
 		this._onAction = onAction;
 	}
 
@@ -91,6 +98,8 @@ export default class FrameFacade implements IFrameFacade {
 				this._onAdd(action);
 			} else if (action instanceof InputAction) {
 				this._onInput(action);
+			} else if (action instanceof RemoveAction) {
+				this._onRemove(action);
 			}
 
 			this._onAction(action);
@@ -121,6 +130,10 @@ export default class FrameFacade implements IFrameFacade {
 		return toFrame(this);
 	}
 
+	private _onRemove(action: IRemoveAction): void {
+		removeWidget(action.target, this);
+	}
+
 	private _onInput(action: IInputAction): void {
 		if (action.isInsertText()) {
 			this._onInsertText(action);
@@ -130,6 +143,41 @@ export default class FrameFacade implements IFrameFacade {
 			this._onDeleteContentBackward(action);
 		} else if (action.isDeleteContentForward()) {
 			this._onDeleteContentForward(action);
+		} else if (action.isMergeContentBackward()) {
+			this._onMergeContentBackward(action);
+		} else if (action.isMergeContentForward()) {
+			this._onMergeContentForward(action);
+		}
+	}
+
+	private _onMergeContentForward(
+		action: IInputAction<IMergeContentForwardActionData>
+	): void {
+		mergeText(action.target, this, true);
+		this._applyFocus(action.target, action.data.selection);
+	}
+
+	private _onMergeContentBackward(
+		action: IInputAction<IMergeContentBackwardActionData>
+	): void {
+		let textLengthOfFoundedElementBeforeMerging = null;
+		let foundedElement: ITextWidgetFacade = null;
+
+		mergeText(action.target, this, false, (mergedTextFacade) => {
+			textLengthOfFoundedElementBeforeMerging = mergedTextFacade.length;
+			foundedElement = mergedTextFacade;
+		});
+
+		if (
+			typeof textLengthOfFoundedElementBeforeMerging === 'number' &&
+			foundedElement
+		) {
+			this._applyFocus(foundedElement, {
+				anchor: textLengthOfFoundedElementBeforeMerging,
+				focus: textLengthOfFoundedElementBeforeMerging,
+				direction: null,
+				offset: null,
+			});
 		}
 	}
 
@@ -153,14 +201,19 @@ export default class FrameFacade implements IFrameFacade {
 			this,
 			action.data.selection
 		);
-		const focusCallback = this._focusCallbackMap.get(newText);
+
+		this._applyFocus(newText, {
+			anchor: 0,
+			focus: 0,
+			offset: null,
+			direction: 'right',
+		});
+	}
+
+	private _applyFocus(widget: IWidgetFacade, selection: ISelection): void {
+		const focusCallback = this._focusCallbackMap.get(widget);
 		if (focusCallback) {
-			focusCallback({
-				anchor: 0,
-				focus: 0,
-				offset: null,
-				direction: 'right',
-			});
+			focusCallback(selection);
 		}
 	}
 
@@ -173,7 +226,7 @@ export default class FrameFacade implements IFrameFacade {
 			this,
 			action.target,
 			action.data.position,
-			action.getSample(this._facadeMap)
+			action.getSample(this.widgetFacadeMap)
 		);
 	}
 }
