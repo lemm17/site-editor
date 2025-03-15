@@ -3,6 +3,7 @@ import CFDFSTraverse from '../CFDFSTraverse';
 import correctSmartIndexes, { correctParentIndex } from './correctSmartIndexes';
 import getParent from './getParent';
 import isTextFacade from './isTextFacade';
+import removeWidget from './removeWidget';
 import { splitChildrenByTarget } from './split';
 
 export default function mergeText(
@@ -40,22 +41,8 @@ export default function mergeText(
 			// Устанавливаем новое смерженное содержимое в нужный виджет
 			textToMerge.children = mergedChildren;
 
-			// Находим родителя удаляемого виджета
-			const parentOfTextToDelete = getParent(textToDelete, frameFacade);
-			// Сплитим родителя по удаляемому виджету
-			const [leftPartOfTargetParent, rightPartOfTargetParent] =
-				splitChildrenByTarget(parentOfTextToDelete.children, textToDelete);
-			// Корректируем индексы правой части от таргета, т. к. таргет удален
-			correctSmartIndexes(
-				rightPartOfTargetParent,
-				leftPartOfTargetParent.length
-			);
-
-			// Устанавливаем новое содержимое родителю, удалив нужный виджет
-			parentOfTextToDelete.children = [
-				...leftPartOfTargetParent,
-				...rightPartOfTargetParent,
-			];
+			// Удаляем виджет откуда утащили контент
+			removeWidget(textToDelete, frameFacade);
 
 			// Останавливаем проход по дереву
 			return true;

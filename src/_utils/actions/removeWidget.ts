@@ -20,7 +20,7 @@ export default function removeWidget(
 		? getParent(target, frameFacadeOrParent)
 		: frameFacadeOrParent;
 	const [leftPart, rightPart] = splitChildrenByTarget(parent.children, target);
-	correctSmartIndexes(rightPart, target.path.at(-1));
+	correctSmartIndexes(rightPart, leftPart.length);
 	const newChildren = [...leftPart, ...rightPart];
 
 	parent.children = newChildren;

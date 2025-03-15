@@ -6,6 +6,7 @@ import {
 	IAddActionData,
 	IBaseFacade,
 	IBaseFacadeCfg,
+	IFrameFacade,
 	IProperties,
 	IWidget,
 	IWidgetFacadeMap,
@@ -28,6 +29,7 @@ export default abstract class BaseFacade<Properties extends IProperties = {}>
 	readonly type: WIDGETS | typeof PLAIN_TEXT_FACADE_TYPE;
 	readonly id: UUID;
 	readonly properties: Properties;
+	readonly frameFacade: IFrameFacade;
 
 	get path(): Path {
 		return this._path.map((x) => x[0]);
@@ -59,6 +61,7 @@ export default abstract class BaseFacade<Properties extends IProperties = {}>
 		bubbleEvent,
 		widgetFacadeCreator,
 		widgetFacadeMap,
+		frameFacade,
 	}: IBaseFacadeCfg<Properties>) {
 		this.id = id;
 		this._path = path;
@@ -68,6 +71,7 @@ export default abstract class BaseFacade<Properties extends IProperties = {}>
 		this.bubbleEvent = bubbleEvent;
 		this.widgetFacadeCreator = widgetFacadeCreator;
 		this.widgetFacadeMap = widgetFacadeMap;
+		this.frameFacade = frameFacade;
 	}
 
 	add(addActionData: IAddActionData, initiator: IBaseFacade = this): void {

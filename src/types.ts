@@ -137,6 +137,7 @@ export interface IBaseFacadeCfg<Properties extends IProperties = {}> {
 	type: WIDGETS | typeof PLAIN_TEXT_FACADE_TYPE;
 	path: SmartPath;
 	properties: Properties;
+	frameFacade: IFrameFacade;
 	children: IBaseFacade[];
 	bubbleEvent: BubbleEventFunc;
 	widgetFacadeCreator: WidgetFacadeCreator;
@@ -187,6 +188,7 @@ export interface IBaseFacade<Properties extends IProperties = {}>
 	readonly id: UUID;
 	readonly type: WIDGETS | typeof PLAIN_TEXT_FACADE_TYPE;
 	readonly properties: Properties;
+	readonly frameFacade: IFrameFacade;
 
 	add(addActionData: IAddActionData, initiator?: IBaseFacade): void;
 	remove(initiator?: IBaseFacade): void;

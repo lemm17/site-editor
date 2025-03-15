@@ -81,7 +81,7 @@ export default class FrameFacade implements IFrameFacade {
 	) {
 		const bubbleEvent = createBubbleEventFunc(this);
 		const [widgetFacadeConstructor, widgetFacadeCreator] =
-			createWidgetFacadeConstructors(bubbleEvent, facadeMap);
+			createWidgetFacadeConstructors(bubbleEvent, facadeMap, this);
 
 		this.widgetFacadeMap = facadeMap;
 		this.widgetFacadeConstructor = widgetFacadeConstructor;

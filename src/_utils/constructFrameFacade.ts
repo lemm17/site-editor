@@ -14,11 +14,13 @@ import {
 	IWidgetFacadeMap,
 	IPlainTextFacade,
 	SmartPath,
+	IFrameFacade,
 } from 'types';
 
 export function createWidgetFacadeConstructors(
 	bubbleEvent: BubbleEventFunc,
-	widgetFacadeMap: IWidgetFacadeMap
+	widgetFacadeMap: IWidgetFacadeMap,
+	frameFacade: IFrameFacade
 ): [WidgetFacadeConstructor, WidgetFacadeCreator] {
 	const constructWidgetFacade: WidgetFacadeConstructor = (
 		widget,
@@ -67,6 +69,7 @@ export function createWidgetFacadeConstructors(
 				path,
 				widgetFacadeCreator,
 				bubbleEvent,
+				frameFacade,
 				text
 			);
 		}
@@ -81,6 +84,7 @@ export function createWidgetFacadeConstructors(
 				bubbleEvent,
 				widgetFacadeMap,
 				widgetFacadeCreator,
+				frameFacade,
 			});
 		}
 
@@ -93,6 +97,7 @@ export function createWidgetFacadeConstructors(
 			bubbleEvent,
 			widgetFacadeCreator,
 			widgetFacadeMap,
+			frameFacade,
 		});
 	};
 
@@ -117,6 +122,7 @@ export function createPlainTextFacade(
 	path: SmartPath,
 	widgetFacadeCreator: WidgetFacadeCreator,
 	bubbleEvent: BubbleEventFunc,
+	frameFacade: IFrameFacade,
 	text = ''
 ): IPlainTextFacade {
 	return new widgetFacadeMap[PLAIN_TEXT_FACADE_TYPE]({
@@ -128,6 +134,7 @@ export function createPlainTextFacade(
 		bubbleEvent,
 		text,
 		widgetFacadeMap,
+		frameFacade,
 		widgetFacadeCreator,
 	});
 }
