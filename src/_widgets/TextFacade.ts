@@ -50,6 +50,9 @@ export default class TextFacade
 	get length(): number {
 		return computeTextLength(this);
 	}
+	get container(): HTMLElement {
+		return this._container;
+	}
 
 	input(data: IInputActionData): void {
 		const insertTextAction = createAction(ACTION.INPUT, {

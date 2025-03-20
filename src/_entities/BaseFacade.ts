@@ -30,6 +30,7 @@ export default abstract class BaseFacade<Properties extends IProperties = {}>
 	readonly id: UUID;
 	readonly properties: Properties;
 	readonly frameFacade: IFrameFacade;
+	readonly isInline: boolean;
 
 	get path(): Path {
 		return this._path.map((x) => x[0]);

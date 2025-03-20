@@ -1,14 +1,75 @@
-import { ICaretPosition, ISelection, ITextWidgetFacade } from 'types';
+import {
+	ICaretPosition,
+	ISelection,
+	ITextWidgetFacade,
+	SyntheticSelectionRects,
+} from 'types';
 import { default as isEmpty } from './isEmpty';
 import {
 	getCaretPosition,
 	getInitialCaretPosition,
 	setCaret,
 	searchCaretPositionByOffset,
-	searchCaretPositionBySelection,
+	searchCaretPositionByTextOffset,
+	computeSyntheticSelectionRects,
 } from './caret';
+import isCollapsed from './isCollapsed';
 
 export default function applySelection(
+	target: HTMLElement,
+	textFacade: ITextWidgetFacade,
+	selection: ISelection
+): SyntheticSelectionRects {
+	if (!selection) {
+		return [];
+	}
+
+	if (selection.focusText === textFacade) {
+		applyNativeSelection(target, textFacade, selection);
+		return [];
+	}
+
+	const initialStartCaretPosition = getInitialCaretPosition(
+		target,
+		'start',
+		true
+	);
+	const initialEndCaretPosition = getInitialCaretPosition(target, 'end', true);
+
+	if (selection.anchorText === textFacade) {
+		const isUpDirection =
+			selection.direction === 'up' || selection.direction === 'left';
+
+		const anchorCaretPosition = getCaretPosition(
+			target,
+			'start',
+			searchCaretPositionByTextOffset,
+			selection.anchorOffset,
+			textFacade
+		);
+
+		const startCaretPosition = isUpDirection
+			? initialStartCaretPosition
+			: anchorCaretPosition;
+		const endCaretPosition = isUpDirection
+			? anchorCaretPosition
+			: initialEndCaretPosition;
+
+		return computeSyntheticSelectionRects(
+			target,
+			startCaretPosition,
+			endCaretPosition
+		);
+	}
+
+	return computeSyntheticSelectionRects(
+		target,
+		initialStartCaretPosition,
+		initialEndCaretPosition
+	);
+}
+
+function applyNativeSelection(
 	target: HTMLElement,
 	textFacade: ITextWidgetFacade,
 	selection: ISelection
@@ -16,33 +77,49 @@ export default function applySelection(
 	const fromRight = selection.direction === 'left';
 	const fromLeft = selection.direction === 'right';
 
-	let caretPosition: ICaretPosition;
+	let focusCaretPosition: ICaretPosition;
+	let anchorCaretPosition: ICaretPosition;
 	if (fromLeft || isEmpty(target)) {
-		caretPosition = getInitialCaretPosition(target, 'start');
+		focusCaretPosition = getInitialCaretPosition(target, 'start');
+		anchorCaretPosition = focusCaretPosition;
 	} else if (fromRight) {
-		caretPosition = getInitialCaretPosition(target, 'end');
+		focusCaretPosition = getInitialCaretPosition(target, 'end');
+		anchorCaretPosition = focusCaretPosition;
 	} else {
 		const startSearchFrom = selection.direction === 'up' ? 'end' : 'start';
-		if (selection.offset) {
-			caretPosition = getCaretPosition(
+		if (isCollapsed(selection) && typeof selection.offset === 'number') {
+			focusCaretPosition = getCaretPosition(
 				target,
 				startSearchFrom,
 				searchCaretPositionByOffset,
 				selection.offset
 			);
+			anchorCaretPosition = focusCaretPosition;
 		} else {
-			// TODO: Тут должно возвращаться левая и правая позиция каретки
-			// сейчас возвращается только одна. Нужно исправить.
-			// Пока не привело ни к каким сайд-эффектам
-			caretPosition = getCaretPosition(
+			focusCaretPosition = getCaretPosition(
 				target,
 				startSearchFrom,
-				searchCaretPositionBySelection,
-				selection,
+				searchCaretPositionByTextOffset,
+				selection.focusOffset,
 				textFacade
 			);
+
+			if (selection.anchorText === selection.focusText) {
+				anchorCaretPosition = getCaretPosition(
+					target,
+					startSearchFrom,
+					searchCaretPositionByTextOffset,
+					selection.anchorOffset,
+					textFacade
+				);
+			} else {
+				anchorCaretPosition = getInitialCaretPosition(
+					target,
+					startSearchFrom
+				);
+			}
 		}
 	}
 
-	setCaret(target, caretPosition);
+	setCaret(target, anchorCaretPosition, focusCaretPosition);
 }

@@ -1,0 +1,19 @@
+.syntetic-selection {
+    position: relative;
+    height: 100%;
+    width: 100%;
+    pointer-events: none;
+}
+
+.syntetic-selection-row {
+    position: absolute;
+    background-color: rgba(50, 151, 253, .4);
+}
+
+::selection {
+    background: rgba(50, 151, 253, .4); /* Safari */ 
+}
+    
+::-moz-selection {
+    background: rgba(50, 151, 253, .4); /* Firefox */
+}

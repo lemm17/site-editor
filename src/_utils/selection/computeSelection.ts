@@ -1,6 +1,8 @@
 import {
+	IAnchorPoint,
 	ICaretPosition,
 	IDirection,
+	IFocusPoint,
 	INLINE_WIDGET_OFFSET_LENGTH,
 	IPlainTextFacade,
 	ISelection,
@@ -10,6 +12,11 @@ import {
 import { isForwardSelection, getRange } from './range';
 import { getCoords } from './coords';
 import { getParentIfText } from './textNodes';
+import {
+	getCaretPosition,
+	getCurrentAnchorCaretPosition,
+	searchCaretPositionByOffset,
+} from './caret';
 
 /**
  * Перед вызовом функции необходимо убедиться, что selection
@@ -135,10 +142,66 @@ export default function computeSelection(
 	};
 }
 
-export function computeSelectionByCaretPosition(
+export function computeOffset(range: Range = getRange()): number {
+	return getCoords(range, isForwardSelection(range)).x;
+}
+
+export function facadeContainsSelection(
+	textFacade: ITextWidgetFacade
+): boolean {
+	const range = getRange();
+
+	if (!range || !range.commonAncestorContainer) {
+		return false;
+	}
+
+	let current = range.commonAncestorContainer.parentElement;
+	while (current) {
+		if (current.getAttribute('data-inline') === 'false') {
+			return current.id === textFacade.id;
+		}
+		current = current.parentElement;
+	}
+
+	return false;
+}
+
+export function computeAnchorOffset(
+	textFacade: ITextWidgetFacade
+): IAnchorPoint['anchorOffset'] | null {
+	if (!facadeContainsSelection(textFacade)) {
+		return null;
+	}
+
+	const anchorCaretPosition = getCurrentAnchorCaretPosition();
+
+	return computeOffsetByCaretPosition(
+		anchorCaretPosition,
+		textFacade
+	) as IAnchorPoint['anchorOffset'];
+}
+
+export function computeTextOffsetByOffsetX(
+	textFacade: ITextWidgetFacade,
+	offsetX: number,
+	direction: IDirection
+): number {
+	const startSearchFrom = direction === 'up' ? 'end' : 'start';
+
+	const caretPosition = getCaretPosition(
+		textFacade.container,
+		startSearchFrom,
+		searchCaretPositionByOffset,
+		offsetX
+	);
+
+	return computeOffsetByCaretPosition(caretPosition, textFacade);
+}
+
+export function computeOffsetByCaretPosition(
 	caretPosition: ICaretPosition,
 	textFacade: ITextWidgetFacade
-): ISelection {
+): number {
 	const element = getParentIfText(caretPosition.node);
 	const elementId = element?.id;
 	if (!elementId) {
@@ -166,38 +229,5 @@ export function computeSelectionByCaretPosition(
 		}
 	}
 
-	return {
-		anchor: textOffset,
-		focus: textOffset,
-		direction: null,
-		offset: null,
-	};
-}
-
-export function computeOffset(range: Range = getRange()): number {
-	return getCoords(range, isForwardSelection(range)).x;
-}
-
-export function facadeContainsSelection(
-	textFacade: ITextWidgetFacade
-): boolean {
-	const range = getRange();
-
-	if (!range) {
-		throw new Error('There are no any ranges in selection');
-	}
-
-	if (!range.commonAncestorContainer) {
-		throw new Error('No commonAncestorContainer in selection range');
-	}
-
-	let current = range.commonAncestorContainer.parentElement;
-	while (current) {
-		if (current.getAttribute('data-inline') === 'false') {
-			return current.id === textFacade.id;
-		}
-		current = current.parentElement;
-	}
-
-	return false;
+	return textOffset;
 }

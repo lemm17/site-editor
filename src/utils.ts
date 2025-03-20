@@ -17,6 +17,8 @@ export {
 	default as computeSelection,
 	computeOffset,
 	facadeContainsSelection,
+	computeTextOffsetByOffsetX,
+	computeAnchorOffset,
 } from './_utils/selection/computeSelection';
 export { default as shouldLetOutCursor } from './_utils/selection/shoudLetOutCursor';
 export { default as CFDFSTraverse } from './_utils/CFDFSTraverse';
@@ -38,3 +40,5 @@ export { default as removeWidget } from './_utils/actions/removeWidget';
 export { default as mergeText } from './_utils/actions/mergeText';
 export { normalizedTextChildren } from './_utils/normalize';
 export { default as computeTextLength } from './_utils/computeTextLength';
+export { default as isRightTextPathOf } from './_utils/isRightTextPathOf';
+export { default as computeSelectedWidgets } from './_utils/selection/computeSelectedWidgets';

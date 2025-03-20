@@ -3,9 +3,11 @@ import {
 	ICursorInfo,
 	ISelection,
 	ITextWidgetFacade,
+	SyntheticSelectionRects,
+	SyntheticSelectionRowRect,
 } from 'types';
 import detection from '../detection';
-import { computeSelectionByCaretPosition } from './computeSelection';
+import { computeOffsetByCaretPosition } from './computeSelection';
 import { getRangeCoords } from './coords';
 import isEmpty from './isEmpty';
 import { default as isEqualSelection } from './isEqual';
@@ -42,12 +44,30 @@ export function getCurrentCaretPosition(): ICaretPosition {
 	};
 }
 
+export function getCurrentAnchorCaretPosition(): ICaretPosition {
+	const selection = document.getSelection();
+
+	return {
+		node: selection.anchorNode,
+		offset: selection.anchorOffset,
+	};
+}
+
 export function getInitialCaretPosition(
 	target: HTMLElement,
-	from: 'start' | 'end'
+	from: 'start' | 'end',
+	withRect: boolean = false
 ): ICaretPosition {
 	const node = getTextNode(target, from);
 	const offset = from === 'end' ? node.textContent.length : 0;
+
+	if (withRect) {
+		return {
+			node,
+			offset,
+			rect: getCaretRectAtPosition({ node, offset }),
+		};
+	}
 
 	return {
 		node,
@@ -57,7 +77,8 @@ export function getInitialCaretPosition(
 
 export function setCaret(
 	target: HTMLElement,
-	caretPosition: ICaretPosition
+	anchorCaretPosition: ICaretPosition,
+	focusCaretPosition: ICaretPosition
 ): void {
 	// В safari перед изменением выделения нужно активировать контейнер,
 	// где находится нода из выделения
@@ -66,12 +87,17 @@ export function setCaret(
 	}
 
 	const selection = window.getSelection();
-	selection.collapse(caretPosition.node, caretPosition.offset);
+	selection.setBaseAndExtent(
+		anchorCaretPosition.node,
+		anchorCaretPosition.offset,
+		focusCaretPosition.node,
+		focusCaretPosition.offset
+	);
 
 	if (!detection.safari) {
 		// Исправляет ошибку:
 		// https://online.sbis.ru/opendoc.html?guid=905254c4-95bf-40c1-a2ae-fbda8de93710&client=3
-		caretPosition.node.parentElement?.focus();
+		focusCaretPosition.node.parentElement?.focus();
 	}
 }
 
@@ -258,28 +284,93 @@ export const searchCaretPositionByOffset: CaretSearcher<[number]> = (
 	return caretPosition;
 };
 
-/**
- * TODO:
- * Функция работает неправильно с не схлопнутым selection'ом.
- * Фактически сейчас она ожидает, что он схлопнут и только тогда
- * будет работать корректно. Необходимо исправить и возвращать 2
- * позиции каретки
- */
-export const searchCaretPositionBySelection: CaretSearcher<
-	[ISelection, ITextWidgetFacade]
-> = (searchConfiguration, selection, textFacade) => {
+function prepareSelectionRowRect(rowRect: {
+	left: number;
+	top: number;
+	height: number;
+	width: number;
+}): SyntheticSelectionRowRect {
+	return {
+		left: `${rowRect.left}px`,
+		top: `${rowRect.top}px`,
+		width: `${rowRect.width}px`,
+		height: `${rowRect.height}px`,
+	};
+}
+
+export function computeSyntheticSelectionRects(
+	target: HTMLElement,
+	startCaretPosition: ICaretPosition,
+	endCaretPosition: ICaretPosition
+): SyntheticSelectionRects {
+	const selectionRects: SyntheticSelectionRects = [];
+	const targetRect = target.getBoundingClientRect();
+
+	const rectOfStart = getCaretRectAtPosition(startCaretPosition);
+	let caretPosition = startCaretPosition;
+	let currentRowRect = {
+		left: rectOfStart.left - targetRect.left,
+		top: rectOfStart.top - targetRect.top,
+		height: rectOfStart.height,
+		width: 0,
+	};
+	while (true) {
+		const newCaretPosition = searchCaretPositionStep(caretPosition, true);
+		const haveReachedEdge = isEqualCaretPosition(
+			newCaretPosition,
+			endCaretPosition
+		);
+
+		const haveMovedOnNextLine =
+			newCaretPosition.rect.y >
+			caretPosition.rect.y + caretPosition.rect.height;
+
+		if (haveMovedOnNextLine || haveReachedEdge) {
+			const caretForWidthComputing = haveMovedOnNextLine
+				? caretPosition
+				: newCaretPosition;
+			const currentRowWidth =
+				caretForWidthComputing.rect.right -
+				targetRect.left -
+				currentRowRect.left;
+
+			currentRowRect.width = currentRowWidth;
+
+			selectionRects.push(prepareSelectionRowRect(currentRowRect));
+
+			if (haveReachedEdge) {
+				break;
+			}
+
+			currentRowRect = {
+				left: caretPosition.rect.left - targetRect.left,
+				top: caretPosition.rect.top - targetRect.top,
+				height: caretPosition.rect.height,
+				width: 0,
+			};
+		}
+
+		caretPosition = newCaretPosition;
+	}
+
+	return selectionRects;
+}
+
+export const searchCaretPositionByTextOffset: CaretSearcher<
+	[number, ITextWidgetFacade]
+> = (searchConfiguration, textOffset, textFacade) => {
 	const { initialCaretPosition, extremeCaretPosition, startSearchFrom } =
 		searchConfiguration;
 	const toRight = startSearchFrom === 'start';
 
 	let caretPosition = initialCaretPosition;
 	while (true) {
-		const caretPositionSelection = computeSelectionByCaretPosition(
+		const caretPositionOffset = computeOffsetByCaretPosition(
 			caretPosition,
 			textFacade
 		);
 
-		if (isEqualSelection(caretPositionSelection, selection)) {
+		if (caretPositionOffset === textOffset) {
 			break;
 		}
 

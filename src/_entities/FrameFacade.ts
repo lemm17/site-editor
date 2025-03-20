@@ -11,6 +11,7 @@ import {
 	ChildrenSetter,
 	mergeText,
 	removeWidget,
+	computeSelectedWidgets,
 } from 'utils';
 import {
 	IFrame,
@@ -36,6 +37,10 @@ import {
 	IMergeContentForwardActionData,
 	IMergeContentBackwardActionData,
 	ITextWidgetFacade,
+	IAnchorPoint,
+	IFocusPoint,
+	IDirection,
+	IBaseFacade,
 } from 'types';
 import { AddAction, InputAction, RemoveAction } from './Action';
 
@@ -67,12 +72,17 @@ export default class FrameFacade implements IFrameFacade {
 	get smartPath(): SmartPath {
 		return [];
 	}
+	get anchorPoint(): IAnchorPoint {
+		return this._anchorPoint;
+	}
 
 	private readonly _focusCallbackMap: WeakMap<IWidgetFacade, FocusCallback> =
 		new Map();
 	private readonly _onAction: <T extends ACTION, D>(
 		action: IAction<T, D>
 	) => void;
+	private _anchorPoint: IAnchorPoint = null;
+	private _selectedWidgets: IWidgetFacade[] = [];
 
 	constructor(
 		frame: IFrame,
@@ -106,11 +116,11 @@ export default class FrameFacade implements IFrameFacade {
 		}
 	}
 
-	subscribeFocus(value: IWidgetFacade, callback: FocusCallback): void {
+	_subscribeFocus(value: IWidgetFacade, callback: FocusCallback): void {
 		this._focusCallbackMap.set(value, callback);
 	}
 
-	leaveFocus(value: IWidgetFacade, selection: ISelection): void {
+	_leaveFocus(value: IWidgetFacade, selection: ISelection): void {
 		const direction =
 			selection.direction === 'down' || selection.direction === 'right'
 				? 'right'
@@ -124,6 +134,56 @@ export default class FrameFacade implements IFrameFacade {
 				return true;
 			}
 		});
+	}
+
+	_mouseLeaveText(
+		value: ITextWidgetFacade,
+		anchorOffset: IAnchorPoint['anchorOffset']
+	): void {
+		if (!this._anchorPoint) {
+			this._anchorPoint = {
+				anchorText: value,
+				anchorOffset,
+			};
+			this._selectedWidgets = [value];
+
+			// TODO: Применить синтетическое выделение на value
+
+			// TODO: Придумать в какой момент сбрасывать selection
+			// const onMouseDown = () => {}
+			// document.addEventListener('mousedown',)
+		}
+	}
+
+	_mouseEnterText(
+		value: ITextWidgetFacade,
+		focusOffset: IFocusPoint['focusOffset'],
+		direction: IDirection
+	): void {
+		if (this._anchorPoint && this._selectedWidgets) {
+			const selection: ISelection = {
+				...this._anchorPoint,
+				focusText: value,
+				focusOffset,
+				direction,
+				offset: null,
+			};
+
+			const currentSelectedWidgets = computeSelectedWidgets(selection, this);
+			const shouldUnselect = this._selectedWidgets.filter(
+				(widget) => !currentSelectedWidgets.includes(widget)
+			);
+
+			currentSelectedWidgets.forEach((selectedWidget) => {
+				// TODO: Применяем синтетическое выделение на все кроме того в котором focus
+				this._applyFocus(selectedWidget, selection);
+			});
+
+			shouldUnselect.forEach((widgetToUnselect) => {
+				// TODO: Убираем выделение с виджетов, которые стали невыделяемыми
+				this._applyFocus(widgetToUnselect, null);
+			});
+		}
 	}
 
 	toFrame(): IFrame {
