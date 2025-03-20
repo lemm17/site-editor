@@ -195,7 +195,7 @@ export default function Text(props: ITextWidgetComponentProps) {
 			class={TEXT_WIDGET_CLASS_NAME}
 			onBeforeInput={onBeforeInput}
 			onMouseLeave={onMouseLeave}
-			onMouseEnter={onMouseEnter}
+			onMouseEnter={(e) => onMouseEnter(e, ref)}
 		>
 			<div class='syntetic-selection'>
 				<For each={syntheticSelectionRects()}>

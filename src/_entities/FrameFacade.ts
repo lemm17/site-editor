@@ -147,11 +147,27 @@ export default class FrameFacade implements IFrameFacade {
 			};
 			this._selectedWidgets = [value];
 
-			// TODO: Применить синтетическое выделение на value
+			// Создаем функцию, чтобы отследить ближайший mouseup
+			// После mouseup любое изменение selection приводит к сбросу выделенных виджетов
+			// Сбасываем и не забываем отписываться.
+			const onMouseUp = () => {
+				document.removeEventListener('mouseup', onMouseUp);
+				const onSelectionChange = () => {
+					this._selectedWidgets.forEach((selectedWidget) => {
+						this._applyFocus(selectedWidget, null);
+					});
+					this._selectedWidgets = [];
+					this._anchorPoint = null;
 
-			// TODO: Придумать в какой момент сбрасывать selection
-			// const onMouseDown = () => {}
-			// document.addEventListener('mousedown',)
+					document.removeEventListener(
+						'selectionchange',
+						onSelectionChange
+					);
+				};
+				document.addEventListener('selectionchange', onSelectionChange);
+			};
+
+			document.addEventListener('mouseup', onMouseUp, { capture: true });
 		}
 	}
 
@@ -170,19 +186,17 @@ export default class FrameFacade implements IFrameFacade {
 			};
 
 			const currentSelectedWidgets = computeSelectedWidgets(selection, this);
-			const shouldUnselect = this._selectedWidgets.filter(
-				(widget) => !currentSelectedWidgets.includes(widget)
-			);
+			this._selectedWidgets.forEach((widget) => {
+				const shouldUnselect = !currentSelectedWidgets.includes(widget);
+				if (shouldUnselect) {
+					this._applyFocus(widget, null);
+				}
+			});
 
 			currentSelectedWidgets.forEach((selectedWidget) => {
-				// TODO: Применяем синтетическое выделение на все кроме того в котором focus
 				this._applyFocus(selectedWidget, selection);
 			});
-
-			shouldUnselect.forEach((widgetToUnselect) => {
-				// TODO: Убираем выделение с виджетов, которые стали невыделяемыми
-				this._applyFocus(widgetToUnselect, null);
-			});
+			this._selectedWidgets = currentSelectedWidgets;
 		}
 	}
 

@@ -18,9 +18,6 @@ export default function useMouseLeave(value: ITextWidgetFacade) {
 			if (typeof anchorOffset === 'number') {
 				frameFacade._mouseLeaveText(value, anchorOffset);
 			}
-
-			document.getSelection().collapseToStart();
-			value.container.blur();
 		}
 	};
 

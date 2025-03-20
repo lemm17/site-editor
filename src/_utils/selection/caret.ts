@@ -298,6 +298,8 @@ function prepareSelectionRowRect(rowRect: {
 	};
 }
 
+const ADDITIONAL_SYNTHETIC_SELECTION_WIDTH = 4;
+
 export function computeSyntheticSelectionRects(
 	target: HTMLElement,
 	startCaretPosition: ICaretPosition,
@@ -322,7 +324,7 @@ export function computeSyntheticSelectionRects(
 		);
 
 		const haveMovedOnNextLine =
-			newCaretPosition.rect.y >
+			newCaretPosition.rect.y >=
 			caretPosition.rect.y + caretPosition.rect.height;
 
 		if (haveMovedOnNextLine || haveReachedEdge) {
@@ -334,7 +336,14 @@ export function computeSyntheticSelectionRects(
 				targetRect.left -
 				currentRowRect.left;
 
-			currentRowRect.width = currentRowWidth;
+			if (haveReachedEdge) {
+				currentRowRect.width = currentRowWidth;
+			} else {
+				// Нативный селекшн выделяет с каким-то отступом сбоку при переносе строки.
+				// Можно убрать и наглядно понаблюдать о чем речь при кросс-селекшене.
+				currentRowRect.width =
+					currentRowWidth + ADDITIONAL_SYNTHETIC_SELECTION_WIDTH;
+			}
 
 			selectionRects.push(prepareSelectionRowRect(currentRowRect));
 
@@ -343,9 +352,9 @@ export function computeSyntheticSelectionRects(
 			}
 
 			currentRowRect = {
-				left: caretPosition.rect.left - targetRect.left,
-				top: caretPosition.rect.top - targetRect.top,
-				height: caretPosition.rect.height,
+				left: newCaretPosition.rect.left - targetRect.left,
+				top: newCaretPosition.rect.top - targetRect.top,
+				height: newCaretPosition.rect.height,
 				width: 0,
 			};
 		}

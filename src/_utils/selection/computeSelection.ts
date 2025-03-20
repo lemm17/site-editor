@@ -183,13 +183,14 @@ export function computeAnchorOffset(
 
 export function computeTextOffsetByOffsetX(
 	textFacade: ITextWidgetFacade,
+	container: HTMLElement,
 	offsetX: number,
 	direction: IDirection
 ): number {
 	const startSearchFrom = direction === 'up' ? 'end' : 'start';
 
 	const caretPosition = getCaretPosition(
-		textFacade.container,
+		container,
 		startSearchFrom,
 		searchCaretPositionByOffset,
 		offsetX

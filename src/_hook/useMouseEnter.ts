@@ -8,7 +8,7 @@ const PRIMARY_BUTTON_PRESSED = 1;
 export default function useMouseEnter(value: ITextWidgetFacade) {
 	const { frameFacade } = useContext(EditorContext);
 
-	const onMouseEnter = (e: MouseEvent) => {
+	const onMouseEnter = (e: MouseEvent, container: HTMLElement) => {
 		const anchorPoint = frameFacade.anchorPoint;
 
 		if (e.buttons === PRIMARY_BUTTON_PRESSED && anchorPoint) {
@@ -22,6 +22,7 @@ export default function useMouseEnter(value: ITextWidgetFacade) {
 
 			const focusOffset = computeTextOffsetByOffsetX(
 				value,
+				container,
 				e.pageX,
 				direction
 			);
