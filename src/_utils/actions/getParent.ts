@@ -1,10 +1,7 @@
-import { IBaseFacade, IFrameFacade, IWidgetFacade } from 'types';
+import { IBaseFacade, IWidgetFacade } from 'types';
 import getWFByPath from './getWFByPath';
 
-export default function getParent(
-	target: IBaseFacade,
-	frameFacade: IFrameFacade
-): IWidgetFacade {
+export default function getParent(target: IBaseFacade): IWidgetFacade {
 	const parentPath = target.path.slice(0, -1);
-	return getWFByPath(frameFacade, parentPath);
+	return getWFByPath(target.frameFacade, parentPath);
 }

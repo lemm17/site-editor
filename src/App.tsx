@@ -23,7 +23,7 @@ const mockedValue: IFrame = [
 let preRef: HTMLPreElement;
 const onAction = () => {
 	preRef.innerHTML = highlightJSON(
-		JSON.stringify(frameFacade.toFrame(), null, 4)
+		JSON.stringify(frameFacade.toFrame(true), null, 4)
 	);
 };
 const frameFacade = new FrameFacade(mockedValue, widgetFacadeMap, () =>

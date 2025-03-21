@@ -1,6 +1,5 @@
 import {
 	IDirection,
-	ISelection,
 	ITextWidgetComponentProps,
 	TEXT_WIDGET_CLASS_NAME,
 } from 'types';
@@ -61,101 +60,57 @@ export default function Text(props: ITextWidgetComponentProps) {
 	};
 
 	const onInsertParagraph = (e: InputEvent): void => {
-		const selectionBeforeInput = computeSelection(props.value, ref);
-
 		props.value.input({
 			type: 'insertParagraph',
 			timeStamp: e.timeStamp,
-			selection: selectionBeforeInput,
+			selection: computeSelection(props.value),
 		});
-
-		// Постановку курсора в новый параграф делигируем фрейм-фасаду
 	};
 
 	const onDeleteContent = (e: InputEvent, backward: boolean): void => {
 		const forward = !backward;
-		const selectionBeforeInput = computeSelection(props.value, ref);
+		const selection = computeSelection(props.value);
 		const currentLength = props.value.length;
 
 		const shouldMergeContentBackward =
 			backward &&
-			selectionBeforeInput.anchorOffset === 0 &&
-			selectionBeforeInput.focusOffset === 0;
+			isCollapsed(selection) &&
+			selection.anchorOffset === 0 &&
+			selection.focusOffset === 0;
 		const shouldMergeContentForward =
 			forward &&
-			selectionBeforeInput.anchorOffset === currentLength &&
-			selectionBeforeInput.focusOffset === currentLength;
+			isCollapsed(selection) &&
+			selection.anchorOffset === currentLength &&
+			selection.focusOffset === currentLength;
 
 		if (shouldMergeContentBackward) {
 			props.value.input({
 				type: 'mergeContentBackward',
 				timeStamp: e.timeStamp,
-				selection: selectionBeforeInput,
+				selection: selection,
 			});
-
-			// Делигируем установку курсора в смерженном состоянии фрейм-фасаду
 		} else if (shouldMergeContentForward) {
 			props.value.input({
 				type: 'mergeContentForward',
 				timeStamp: e.timeStamp,
-				selection: selectionBeforeInput,
+				selection: selection,
 			});
-
-			// Делигируем установку курсора в смерженном состоянии фрейм-фасаду
 		} else {
-			const type = backward
-				? 'deleteContentBackward'
-				: 'deleteContentForward';
 			props.value.input({
-				type,
+				type: backward ? 'deleteContentBackward' : 'deleteContentForward',
 				timeStamp: e.timeStamp,
-				selection: selectionBeforeInput,
+				selection: selection,
 			});
-
-			const textOffsetModifier = backward ? -1 : 0;
-			const textOffsetAfterInput = isCollapsed(selectionBeforeInput)
-				? selectionBeforeInput.anchorOffset + textOffsetModifier
-				: Math.min(
-						selectionBeforeInput.anchorOffset,
-						selectionBeforeInput.focusOffset
-					);
-
-			const selectionAfterInput = {
-				anchorText: props.value,
-				focusText: props.value,
-				anchorOffset: textOffsetAfterInput,
-				focusOffset: textOffsetAfterInput,
-				direction: null,
-				offset: null,
-			};
-
-			applySelection(ref, props.value, selectionAfterInput);
 		}
 	};
 
 	const onInsertText = (e: InputEvent): void => {
-		const selectionBeforeInput = computeSelection(props.value, ref);
 		props.value.input({
 			type: 'insertText',
 			timeStamp: e.timeStamp,
 			text: e.data,
-			selection: selectionBeforeInput,
+			selection: computeSelection(props.value),
 		});
-
-		const textOffsetAfterInput =
-			Math.min(
-				selectionBeforeInput.anchorOffset,
-				selectionBeforeInput.focusOffset
-			) + 1;
-		const selectionAfterInput: ISelection = {
-			anchorText: props.value,
-			focusText: props.value,
-			anchorOffset: textOffsetAfterInput,
-			focusOffset: textOffsetAfterInput,
-			direction: null,
-			offset: null,
-		};
-		applySelection(ref, props.value, selectionAfterInput);
 	};
 
 	const onKeyDown = (e: KeyboardEvent) => {
@@ -163,7 +118,7 @@ export default function Text(props: ITextWidgetComponentProps) {
 
 		if (e.key in keyboardKeyToDirectionMap) {
 			const direction = keyboardKeyToDirectionMap[e.key] as IDirection;
-			let selection = computeSelection(props.value, ref, direction);
+			let selection = computeSelection(props.value, direction);
 
 			if (shouldLetOutCursor(e, ref)) {
 				e.preventDefault();

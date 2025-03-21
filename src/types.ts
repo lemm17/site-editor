@@ -178,7 +178,7 @@ export interface IFacade<T extends IFacade<T>> {
 	smartPath: SmartPath;
 
 	_handleAction<T extends ACTION, D>(action: IAction<T, D>): void;
-	toFrame(): IWidget | IFrame | string;
+	toFrame(withPath?: boolean): IWidget | IFrame | string;
 }
 
 export const PLAIN_TEXT_FACADE_TYPE = 'plainText' as const;
@@ -193,14 +193,14 @@ export interface IBaseFacade<Properties extends IProperties = {}>
 
 	add(addActionData: IAddActionData, initiator?: IBaseFacade): void;
 	remove(initiator?: IBaseFacade): void;
-	toFrame(): IWidget | string;
+	toFrame(withPath?: boolean): IWidget | string;
 }
 
 export interface IWidgetFacade<Properties extends IProperties = {}>
 	extends IBaseFacade<Properties> {
 	readonly type: WIDGETS;
 
-	toFrame(): IWidget;
+	toFrame(withPath?: boolean): IWidget;
 }
 
 export interface ITextWidgetFacade extends IWidgetFacade<ITextProps> {
@@ -447,13 +447,17 @@ export type WidgetFacadeCreator = (
 		? ITextWidgetFacade
 		: IBaseFacade<IProperties>;
 
-export interface IEdgesInfo {
-	startChild: IPlainTextFacade;
-	startChildIndexInParent: number;
-	startIndexRelativeToStartChild: number;
-	endChild: IPlainTextFacade;
-	endChildIndexInParent: number;
-	endIndexRelativeToEndChild: number;
+export interface ISelectionInfo {
+	start: IEdgeInfo;
+	middle: IWidgetFacade[];
+	end: IEdgeInfo;
+}
+
+export interface IEdgeInfo {
+	text: ITextWidgetFacade;
+	plainText: IPlainTextFacade;
+	plainTextIndexInParent: number;
+	plainTextOffset: number;
 }
 
 export enum WIDGETS {

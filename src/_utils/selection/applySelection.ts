@@ -24,7 +24,10 @@ export default function applySelection(
 		return [];
 	}
 
-	if (selection.focusText === textFacade) {
+	if (
+		selection.focusText === textFacade ||
+		(isCollapsed(selection) && typeof selection.offset === 'number')
+	) {
 		applyNativeSelection(target, textFacade, selection);
 		return [];
 	}

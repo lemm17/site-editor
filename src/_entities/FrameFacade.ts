@@ -12,6 +12,7 @@ import {
 	mergeText,
 	removeWidget,
 	computeSelectedWidgets,
+	isCollapsed,
 } from 'utils';
 import {
 	IFrame,
@@ -43,6 +44,7 @@ import {
 	IBaseFacade,
 } from 'types';
 import { AddAction, InputAction, RemoveAction } from './Action';
+import isForward from '@/_utils/selection/isForward';
 
 export default class FrameFacade implements IFrameFacade {
 	readonly isFrameFacade: true = true;
@@ -125,7 +127,7 @@ export default class FrameFacade implements IFrameFacade {
 			selection.direction === 'down' || selection.direction === 'right'
 				? 'right'
 				: 'left';
-		CFDFSTraverse(value, this, direction, (regular: IWidgetFacade) => {
+		CFDFSTraverse(value, direction, (regular: IWidgetFacade) => {
 			if (this._focusCallbackMap.has(regular)) {
 				const focusCallback = this._focusCallbackMap.get(regular);
 				focusCallback(selection);
@@ -185,7 +187,7 @@ export default class FrameFacade implements IFrameFacade {
 				offset: null,
 			};
 
-			const currentSelectedWidgets = computeSelectedWidgets(selection, this);
+			const currentSelectedWidgets = computeSelectedWidgets(selection);
 			this._selectedWidgets.forEach((widget) => {
 				const shouldUnselect = !currentSelectedWidgets.includes(widget);
 				if (shouldUnselect) {
@@ -200,12 +202,12 @@ export default class FrameFacade implements IFrameFacade {
 		}
 	}
 
-	toFrame(): IFrame {
-		return toFrame(this);
+	toFrame(withPath: boolean = false): IFrame {
+		return toFrame(this, withPath);
 	}
 
 	private _onRemove(action: IRemoveAction): void {
-		removeWidget(action.target, this);
+		removeWidget(action.target);
 	}
 
 	private _onInput(action: IInputAction): void {
@@ -214,9 +216,9 @@ export default class FrameFacade implements IFrameFacade {
 		} else if (action.isInsertParagraph()) {
 			this._onInsertParagraph(action);
 		} else if (action.isDeleteContentBackward()) {
-			this._onDeleteContentBackward(action);
+			this._onDeleteContent(action, false);
 		} else if (action.isDeleteContentForward()) {
-			this._onDeleteContentForward(action);
+			this._onDeleteContent(action, true);
 		} else if (action.isMergeContentBackward()) {
 			this._onMergeContent(action, false);
 		} else if (action.isMergeContentForward()) {
@@ -238,47 +240,81 @@ export default class FrameFacade implements IFrameFacade {
 			| IInputAction<IMergeContentForwardActionData>,
 		forward: boolean
 	): void {
-		const [textFacade, offset] = mergeText(action.target, this, forward);
+		const [textFacade, offset] = mergeText(action.target, forward);
 
 		if (textFacade && typeof offset === 'number') {
 			this._applyFocus(textFacade, {
-				anchor: offset,
-				focus: offset,
+				anchorText: textFacade,
+				focusText: textFacade,
+				anchorOffset: offset,
+				focusOffset: offset,
 				direction: null,
 				offset: null,
 			});
 		}
 	}
 
-	private _onDeleteContentForward(
-		action: IInputAction<IDeleteContentForwardActionData>
+	private _onDeleteContent(
+		action: IInputAction<IDeleteContentBackwardActionData>,
+		forward: false
+	): void;
+	private _onDeleteContent(
+		action: IInputAction<IDeleteContentForwardActionData>,
+		forward: true
+	): void;
+	private _onDeleteContent(
+		action:
+			| IInputAction<IDeleteContentForwardActionData>
+			| IInputAction<IDeleteContentBackwardActionData>,
+		forward: boolean
 	): void {
-		deleteContent(false, action.target, action.data.selection);
-	}
+		const selection = action.data.selection;
+		const isCollapsedSelection = isCollapsed(selection);
+		const isForwardSelection = isForward(selection);
 
-	private _onDeleteContentBackward(
-		action: IInputAction<IDeleteContentBackwardActionData>
-	): void {
-		deleteContent(true, action.target, action.data.selection);
+		deleteContent(selection, forward);
+
+		const textOffsetModifier = forward ? 0 : -1;
+		const textOffsetAfterInput = isCollapsedSelection
+			? selection.anchorOffset + textOffsetModifier
+			: isForwardSelection
+				? selection.anchorOffset
+				: selection.focusOffset;
+
+		const textAfterInput = isForwardSelection
+			? selection.anchorText
+			: selection.focusText;
+
+		const selectionAfterInput = {
+			anchorText: textAfterInput,
+			focusText: textAfterInput,
+			anchorOffset: textOffsetAfterInput,
+			focusOffset: textOffsetAfterInput,
+			direction: null,
+			offset: null,
+		};
+
+		this._applyFocus(textAfterInput, selectionAfterInput);
 	}
 
 	private _onInsertParagraph(
 		action: IInputAction<IInsertParagraphActionData>
 	): void {
-		const newText = insertParagraph(
-			action.target,
-			this,
-			action.data.selection
-		);
+		const newText = insertParagraph(action.data.selection);
 
 		this._applyFocus(newText, {
-			anchor: 0,
-			focus: 0,
+			anchorText: newText,
+			focusText: newText,
+			anchorOffset: 0,
+			focusOffset: 0,
 			offset: null,
 			direction: 'right',
 		});
 	}
 
+	/**
+	 * TODO: Должен работать только от селекшена, там уже есть вся нужная инфа
+	 */
 	private _applyFocus(widget: IWidgetFacade, selection: ISelection): void {
 		const focusCallback = this._focusCallbackMap.get(widget);
 		if (focusCallback) {
@@ -287,7 +323,28 @@ export default class FrameFacade implements IFrameFacade {
 	}
 
 	private _onInsertText(action: IInputAction<IInsertTextActionData>): void {
-		insertText(action.target, action.data.selection, action.data.text);
+		const selection = action.data.selection;
+		insertText(action.data.text, action.data.selection);
+
+		const isForwardSelection = isForward(selection);
+		const startOffset = isForwardSelection
+			? selection.anchorOffset
+			: selection.focusOffset;
+		const startText = isForwardSelection
+			? selection.anchorText
+			: selection.focusText;
+
+		const textOffsetAfterInput = startOffset + 1;
+
+		const selectionAfterInput: ISelection = {
+			anchorText: startText,
+			focusText: startText,
+			anchorOffset: textOffsetAfterInput,
+			focusOffset: textOffsetAfterInput,
+			direction: null,
+			offset: null,
+		};
+		this._applyFocus(startText, selectionAfterInput);
 	}
 
 	private _onAdd(action: IAddAction): void {

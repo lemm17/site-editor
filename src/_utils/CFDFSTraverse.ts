@@ -8,12 +8,12 @@ type ShouldStop = boolean;
  * но дочерние элементы обрабатываются первыми.
  * Есть возможность досрочно закончить выполнение.
  */
-export default function CFDIPTraverse(
+export default function CFDFSTraverse(
 	target: IBaseFacade,
-	root: IFrameFacade,
 	direction: 'left' | 'right',
 	handler: (regular: IBaseFacade | IFrameFacade) => ShouldStop
 ): void {
+	const root = target.frameFacade;
 	const stack: [IFrameFacade, ...IBaseFacade[]] = [root];
 	const parentPathAsStack = target.path.slice(0, -1).reverse();
 

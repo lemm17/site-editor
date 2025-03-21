@@ -8,7 +8,7 @@ export default abstract class WidgetFacade<Properties extends IProperties = {}>
 	readonly type: WIDGETS;
 	readonly isInline: boolean = false;
 
-	toFrame(): IWidget<Properties> {
-		return super.toFrame() as IWidget<Properties>;
+	toFrame(withPath: boolean = false): IWidget<Properties> {
+		return super.toFrame(withPath) as IWidget<Properties>;
 	}
 }

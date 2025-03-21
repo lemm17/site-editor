@@ -1,6 +1,8 @@
-import { IFrameFacade, ITextWidgetFacade } from 'types';
+import { ITextWidgetFacade } from 'types';
 import CFDFSTraverse from '../CFDFSTraverse';
-import correctSmartIndexes, { correctParentIndex } from './correctSmartIndexes';
+import correctSmartIndexes, {
+	correctParentInChildren,
+} from './correctSmartIndexes';
 import isTextFacade from './isTextFacade';
 import removeWidget, {
 	getParentChildrenWithoutTargetAndCorrectIndexes,
@@ -15,7 +17,6 @@ type OffsetToSelectionApplying = number;
 
 export default function mergeText(
 	target: ITextWidgetFacade,
-	frameFacade: IFrameFacade,
 	forward: boolean
 ): [TextFacadeToSelectionApplying, OffsetToSelectionApplying] {
 	const backward = !forward;
@@ -25,7 +26,7 @@ export default function mergeText(
 	let textToMerge: TextFacadeToSelectionApplying;
 	// Смещение для применения выделения после выполнения процедуры
 	let selectionOffset: OffsetToSelectionApplying;
-	CFDFSTraverse(target, frameFacade, traverseDirection, (candidate) => {
+	CFDFSTraverse(target, traverseDirection, (candidate) => {
 		const isTextWrapper = candidate instanceof TextWrapperFacade;
 		const isParentOfTarget = candidate.children.includes(target);
 		if (
@@ -38,7 +39,7 @@ export default function mergeText(
 			// Определяем текстовый фасад в который будем мержить детей
 			textToMerge = target;
 			// Получаем парента таргета
-			const parentOfTarget = getParent(target, frameFacade);
+			const parentOfTarget = getParent(target);
 			// Удаляем таргет из текущей обертки. Будем выносить его в вышестоящую обертку
 			// Вызываем функцию без применения новых детей!!
 			// Иначе вызовется обработчик изменения детей у обертки и она может самовыпилиться
@@ -81,7 +82,7 @@ export default function mergeText(
 
 			const textToMergeSmartIndex = textToMerge.smartPath.at(-1);
 			// Изменяем индекс родителя правой части, поскольку она будет перенесена
-			correctParentIndex(rightPart, textToMergeSmartIndex);
+			correctParentInChildren(textToMerge, rightPart);
 			// Изменяем собственные индексы правой части
 			correctSmartIndexes(rightPart, leftPart.length);
 			// Объединяем содержимое кандидата и таргета
@@ -91,7 +92,7 @@ export default function mergeText(
 			textToMerge.children = mergedChildren;
 
 			// Удаляем виджет откуда утащили контент
-			removeWidget(textToDelete, frameFacade);
+			removeWidget(textToDelete);
 
 			// Останавливаем проход по дереву
 			return true;

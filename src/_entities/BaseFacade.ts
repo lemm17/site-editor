@@ -95,8 +95,8 @@ export default abstract class BaseFacade<Properties extends IProperties = {}>
 		this._notify(deleteAction);
 	}
 
-	toFrame(): IWidget<Properties> | string {
-		return widgetToFrame(this);
+	toFrame(withPath: boolean = false): IWidget<Properties> | string {
+		return widgetToFrame(this, withPath);
 	}
 
 	_handleAction<T extends ACTION, D>(action: IAction<T, D>): void {

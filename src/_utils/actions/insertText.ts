@@ -1,22 +1,17 @@
-import { ISelection, ITextWidgetFacade } from 'types';
-import getEdgesInfo from './getEdgesInfo';
+import { ISelection } from 'types';
+import getSelectionInfo from './getEdgesInfo';
 import insertTextCrossWidget from './insertTextCrossWidget';
 
-export default function insertText(
-	target: ITextWidgetFacade,
-	selection: ISelection,
-	text: string
-): void {
-	const edgesInfo = getEdgesInfo(target, selection);
+export default function insertText(text: string, selection: ISelection): void {
+	const selectionInfo = getSelectionInfo(selection);
 
-	if (edgesInfo.startChild === edgesInfo.endChild) {
-		edgesInfo.startChild.insertText(
+	if (selectionInfo.start.plainText === selectionInfo.end.plainText) {
+		selectionInfo.start.plainText.insertText(
 			text,
-			edgesInfo.startIndexRelativeToStartChild,
-			edgesInfo.endIndexRelativeToEndChild
+			selectionInfo.start.plainTextOffset,
+			selectionInfo.end.plainTextOffset
 		);
 	} else {
-		const newChildren = insertTextCrossWidget(target, text, edgesInfo);
-		target.children = newChildren;
+		insertTextCrossWidget(text, selectionInfo);
 	}
 }

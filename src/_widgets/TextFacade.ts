@@ -33,7 +33,7 @@ export default class TextFacade
 		let selection;
 		const shouldRestoreSelection = facadeContainsSelection(this);
 		if (shouldRestoreSelection) {
-			selection = computeSelection(this, this._container, null, null);
+			selection = computeSelection(this, null, null);
 		}
 
 		const normalizedChildren = normalizedTextChildren(
@@ -79,6 +79,7 @@ export default class TextFacade
 			path,
 			this.widgetFacadeCreator,
 			this.bubbleEvent,
+			this.frameFacade,
 			text
 		);
 	};

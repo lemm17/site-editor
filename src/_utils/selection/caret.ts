@@ -11,7 +11,7 @@ import { computeOffsetByCaretPosition } from './computeSelection';
 import { getRangeCoords } from './coords';
 import isEmpty from './isEmpty';
 import { default as isEqualSelection } from './isEqual';
-import { getRange, isForwardSelection } from './range';
+import { getRange, isForwardSelectionByRange } from './range';
 import {
 	getCaretRectAtPosition,
 	getCursorRect,
@@ -29,7 +29,7 @@ export function isEqualCaretPosition(
 
 export function getCurrentCaretPosition(): ICaretPosition {
 	const range = getRange();
-	const isForward = isForwardSelection(range);
+	const isForward = isForwardSelectionByRange(range);
 
 	if (isForward) {
 		return {
@@ -316,6 +316,11 @@ export function computeSyntheticSelectionRects(
 		height: rectOfStart.height,
 		width: 0,
 	};
+
+	if (isEqualCaretPosition(startCaretPosition, endCaretPosition)) {
+		return [prepareSelectionRowRect(currentRowRect)];
+	}
+
 	while (true) {
 		const newCaretPosition = searchCaretPositionStep(caretPosition, true);
 		const haveReachedEdge = isEqualCaretPosition(
@@ -395,7 +400,10 @@ export const searchCaretPositionByTextOffset: CaretSearcher<
 		}
 	}
 
-	return caretPosition;
+	return {
+		...caretPosition,
+		rect: getCaretRectAtPosition(caretPosition),
+	};
 };
 
 const MIN_CHAR_OFFSET = 0;

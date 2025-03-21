@@ -16,7 +16,7 @@ export default function addWidget(
 	position: Position,
 	sample: IWidget
 ): void {
-	const parent = getParent(target, frameFacade);
+	const parent = getParent(target);
 
 	const smartPathForNewElement = cloneSmartPathOfTargetAndIncrementIfNeed(
 		target as IWidgetFacade,

@@ -9,7 +9,9 @@ export function getRange(): Range | null {
 	return selection.getRangeAt(selection.rangeCount - 1).cloneRange();
 }
 
-export function isForwardSelection(range: Range = getRange()): boolean | never {
+export function isForwardSelectionByRange(
+	range: Range = getRange()
+): boolean | never {
 	if (!range) {
 		throw new Error('There are no any range in selcetion');
 	}
