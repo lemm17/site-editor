@@ -104,6 +104,10 @@ export default class FrameFacade implements IFrameFacade {
 		this._onAction = onAction;
 	}
 
+	toFrame(withPath: boolean = false): IFrame {
+		return toFrame(this, withPath);
+	}
+
 	_handleAction<T extends ACTION, D>(action: IAction<T, D>): void {
 		if (!action.defaultPrevented) {
 			if (action instanceof AddAction) {
@@ -122,20 +126,88 @@ export default class FrameFacade implements IFrameFacade {
 		this._focusCallbackMap.set(value, callback);
 	}
 
-	_leaveFocus(value: IWidgetFacade, selection: ISelection): void {
-		const direction =
-			selection.direction === 'down' || selection.direction === 'right'
+	/**
+	 * TODO: Когда будем учиться выходить курсором из не текстовых виджетов,
+	 * нужно удалить as ITextWidgetFacade, пока костыль
+	 */
+	_leaveFocus(
+		value: IWidgetFacade,
+		selection: ISelection,
+		shift: boolean
+	): void {
+		const traverseDirection =
+			selection.focusDirection === 'down' ||
+			selection.focusDirection === 'right'
 				? 'right'
 				: 'left';
-		CFDFSTraverse(value, direction, (regular: IWidgetFacade) => {
+		let newFocusText: ITextWidgetFacade = null;
+		CFDFSTraverse(value, traverseDirection, (regular: IWidgetFacade) => {
 			if (this._focusCallbackMap.has(regular)) {
-				const focusCallback = this._focusCallbackMap.get(regular);
-				focusCallback(selection);
+				newFocusText = regular as ITextWidgetFacade;
 
 				// Возвращаем true, чтобы остановить проход по дереву
 				return true;
 			}
 		});
+
+		if (!newFocusText) {
+			return;
+		}
+
+		// focusOffset не определен для направления вверх/вниз, т. к. должен установиться по offsetX
+		const focusOffset =
+			selection.focusDirection === 'left'
+				? newFocusText.length
+				: selection.focusDirection === 'right'
+					? 0
+					: null;
+
+		if (shift) {
+			if (!this._anchorPoint) {
+				this._initCrossSelection(
+					value as ITextWidgetFacade,
+					selection.anchorOffset
+				);
+
+				const clearHandler = (e: InputEvent | KeyboardEvent | Event) => {
+					if (e.type === 'keydown') {
+						// Игнорируем очистку если нажат шифт или любая другая клавиша кроме стрелок
+						if ((e as KeyboardEvent).shiftKey) {
+							return;
+						} else if (!(e as KeyboardEvent).key.includes('Arrow')) {
+							return;
+						}
+					}
+
+					this._clearCrossSelection();
+
+					document.removeEventListener('beforeinput', clearHandler);
+					document.removeEventListener('keydown', clearHandler);
+					document.removeEventListener('mousedown', clearHandler);
+				};
+				document.addEventListener('beforeinput', clearHandler);
+				document.addEventListener('keydown', clearHandler);
+				document.addEventListener('mousedown', clearHandler);
+			}
+
+			const newSelection = {
+				...selection,
+				focusText: newFocusText,
+				focusOffset,
+			};
+
+			this._updateCrossSelection(newSelection);
+		} else {
+			const newSelection = {
+				...selection,
+				anchorText: newFocusText,
+				anchorOffset: focusOffset,
+				focusText: newFocusText,
+				focusOffset,
+			};
+
+			this._applyFocus(newFocusText, newSelection);
+		}
 	}
 
 	_mouseLeaveText(
@@ -143,11 +215,7 @@ export default class FrameFacade implements IFrameFacade {
 		anchorOffset: IAnchorPoint['anchorOffset']
 	): void {
 		if (!this._anchorPoint) {
-			this._anchorPoint = {
-				anchorText: value,
-				anchorOffset,
-			};
-			this._selectedWidgets = [value];
+			this._initCrossSelection(value, anchorOffset);
 
 			// Создаем функцию, чтобы отследить ближайший mouseup
 			// После mouseup любое изменение selection приводит к сбросу выделенных виджетов
@@ -155,11 +223,7 @@ export default class FrameFacade implements IFrameFacade {
 			const onMouseUp = () => {
 				document.removeEventListener('mouseup', onMouseUp);
 				const onSelectionChange = () => {
-					this._selectedWidgets.forEach((selectedWidget) => {
-						this._applyFocus(selectedWidget, null);
-					});
-					this._selectedWidgets = [];
-					this._anchorPoint = null;
+					this._clearCrossSelection();
 
 					document.removeEventListener(
 						'selectionchange',
@@ -179,31 +243,52 @@ export default class FrameFacade implements IFrameFacade {
 		direction: IDirection
 	): void {
 		if (this._anchorPoint && this._selectedWidgets) {
-			const selection: ISelection = {
+			const newSelection: ISelection = {
 				...this._anchorPoint,
 				focusText: value,
 				focusOffset,
-				direction,
-				offset: null,
+				focusDirection: direction,
+				offsetX: null,
 			};
 
-			const currentSelectedWidgets = computeSelectedWidgets(selection);
-			this._selectedWidgets.forEach((widget) => {
-				const shouldUnselect = !currentSelectedWidgets.includes(widget);
-				if (shouldUnselect) {
-					this._applyFocus(widget, null);
-				}
-			});
-
-			currentSelectedWidgets.forEach((selectedWidget) => {
-				this._applyFocus(selectedWidget, selection);
-			});
-			this._selectedWidgets = currentSelectedWidgets;
+			this._updateCrossSelection(newSelection);
 		}
 	}
 
-	toFrame(withPath: boolean = false): IFrame {
-		return toFrame(this, withPath);
+	private _initCrossSelection(
+		anchorText: ITextWidgetFacade,
+		anchorOffset: ISelection['anchorOffset']
+	): void {
+		if (!this._anchorPoint) {
+			this._anchorPoint = {
+				anchorText,
+				anchorOffset,
+			};
+			this._selectedWidgets = [anchorText];
+		}
+	}
+
+	private _updateCrossSelection(selection: ISelection): void {
+		const currentSelectedWidgets = computeSelectedWidgets(selection);
+		this._selectedWidgets.forEach((widget) => {
+			const shouldUnselect = !currentSelectedWidgets.includes(widget);
+			if (shouldUnselect) {
+				this._applyFocus(widget, null);
+			}
+		});
+
+		currentSelectedWidgets.forEach((selectedWidget) => {
+			this._applyFocus(selectedWidget, selection);
+		});
+		this._selectedWidgets = currentSelectedWidgets;
+	}
+
+	private _clearCrossSelection(): void {
+		this._selectedWidgets.forEach((selectedWidget) => {
+			this._applyFocus(selectedWidget, null);
+		});
+		this._selectedWidgets = [];
+		this._anchorPoint = null;
 	}
 
 	private _onRemove(action: IRemoveAction): void {
@@ -248,8 +333,8 @@ export default class FrameFacade implements IFrameFacade {
 				focusText: textFacade,
 				anchorOffset: offset,
 				focusOffset: offset,
-				direction: null,
-				offset: null,
+				focusDirection: null,
+				offsetX: null,
 			});
 		}
 	}
@@ -285,13 +370,13 @@ export default class FrameFacade implements IFrameFacade {
 			? selection.anchorText
 			: selection.focusText;
 
-		const selectionAfterInput = {
+		const selectionAfterInput: ISelection = {
 			anchorText: textAfterInput,
 			focusText: textAfterInput,
 			anchorOffset: textOffsetAfterInput,
 			focusOffset: textOffsetAfterInput,
-			direction: null,
-			offset: null,
+			focusDirection: null,
+			offsetX: null,
 		};
 
 		this._applyFocus(textAfterInput, selectionAfterInput);
@@ -307,8 +392,8 @@ export default class FrameFacade implements IFrameFacade {
 			focusText: newText,
 			anchorOffset: 0,
 			focusOffset: 0,
-			offset: null,
-			direction: 'right',
+			offsetX: null,
+			focusDirection: 'right',
 		});
 	}
 
@@ -341,8 +426,8 @@ export default class FrameFacade implements IFrameFacade {
 			focusText: startText,
 			anchorOffset: textOffsetAfterInput,
 			focusOffset: textOffsetAfterInput,
-			direction: null,
-			offset: null,
+			focusDirection: null,
+			offsetX: null,
 		};
 		this._applyFocus(startText, selectionAfterInput);
 	}

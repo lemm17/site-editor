@@ -116,22 +116,16 @@ export default function Text(props: ITextWidgetComponentProps) {
 	const onKeyDown = (e: KeyboardEvent) => {
 		ignoreZeroWidthSpaceIfNeed(e);
 
-		if (e.key in keyboardKeyToDirectionMap) {
+		if (e.key in keyboardKeyToDirectionMap && shouldLetOutCursor(e, ref)) {
+			e.preventDefault();
+
 			const direction = keyboardKeyToDirectionMap[e.key] as IDirection;
-			let selection = computeSelection(props.value, direction);
-
-			if (shouldLetOutCursor(e, ref)) {
-				e.preventDefault();
-
-				// Проставляем общий offset, а не вычесленный налету ранее
-				const offset = computeOffset();
-				selection = {
-					...selection,
-					offset,
-				};
-
-				leaveFocus(selection);
-			}
+			const selection = computeSelection(
+				props.value,
+				direction,
+				computeOffset()
+			);
+			leaveFocus(selection, e.shiftKey);
 		}
 
 		if (resetOffsetKeys.includes(e.key)) {

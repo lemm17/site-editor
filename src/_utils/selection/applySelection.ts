@@ -1,5 +1,6 @@
 import {
 	ICaretPosition,
+	ICaretPositions,
 	ISelection,
 	ITextWidgetFacade,
 	SyntheticSelectionRects,
@@ -14,6 +15,7 @@ import {
 	computeSyntheticSelectionRects,
 } from './caret';
 import isCollapsed from './isCollapsed';
+import isForward from './isForward';
 
 export default function applySelection(
 	target: HTMLElement,
@@ -24,14 +26,19 @@ export default function applySelection(
 		return [];
 	}
 
-	if (
-		selection.focusText === textFacade ||
-		(isCollapsed(selection) && typeof selection.offset === 'number')
-	) {
+	if (selection.focusText === textFacade) {
 		applyNativeSelection(target, textFacade, selection);
 		return [];
 	}
 
+	return applySyntheticSelection(target, textFacade, selection);
+}
+
+function applySyntheticSelection(
+	target: HTMLElement,
+	textFacade: ITextWidgetFacade,
+	selection: ISelection
+): SyntheticSelectionRects {
 	const initialStartCaretPosition = getInitialCaretPosition(
 		target,
 		'start',
@@ -40,8 +47,7 @@ export default function applySelection(
 	const initialEndCaretPosition = getInitialCaretPosition(target, 'end', true);
 
 	if (selection.anchorText === textFacade) {
-		const isUpDirection =
-			selection.direction === 'up' || selection.direction === 'left';
+		const isForwardSelection = isForward(selection);
 
 		const anchorCaretPosition = getCaretPosition(
 			target,
@@ -51,12 +57,12 @@ export default function applySelection(
 			textFacade
 		);
 
-		const startCaretPosition = isUpDirection
-			? initialStartCaretPosition
-			: anchorCaretPosition;
-		const endCaretPosition = isUpDirection
+		const startCaretPosition = isForwardSelection
 			? anchorCaretPosition
-			: initialEndCaretPosition;
+			: initialStartCaretPosition;
+		const endCaretPosition = isForwardSelection
+			? initialEndCaretPosition
+			: anchorCaretPosition;
 
 		return computeSyntheticSelectionRects(
 			target,
@@ -77,52 +83,168 @@ function applyNativeSelection(
 	textFacade: ITextWidgetFacade,
 	selection: ISelection
 ): void {
-	const fromRight = selection.direction === 'left';
-	const fromLeft = selection.direction === 'right';
-
-	let focusCaretPosition: ICaretPosition;
-	let anchorCaretPosition: ICaretPosition;
-	if (fromLeft || isEmpty(target)) {
-		focusCaretPosition = getInitialCaretPosition(target, 'start');
-		anchorCaretPosition = focusCaretPosition;
-	} else if (fromRight) {
-		focusCaretPosition = getInitialCaretPosition(target, 'end');
-		anchorCaretPosition = focusCaretPosition;
+	let caretPositions: ICaretPositions;
+	if (selection.focusDirection === 'left') {
+		caretPositions = getCaretPositionsWhenLeftDirection(
+			target,
+			textFacade,
+			selection
+		);
+	} else if (selection.focusDirection === 'right') {
+		caretPositions = getCaretPositionsWhenRightDirection(
+			target,
+			textFacade,
+			selection
+		);
+	} else if (typeof selection.offsetX === 'number') {
+		caretPositions = getCaretPositionsByOffset(target, textFacade, selection);
 	} else {
-		const startSearchFrom = selection.direction === 'up' ? 'end' : 'start';
-		if (isCollapsed(selection) && typeof selection.offset === 'number') {
-			focusCaretPosition = getCaretPosition(
-				target,
-				startSearchFrom,
-				searchCaretPositionByOffset,
-				selection.offset
-			);
-			anchorCaretPosition = focusCaretPosition;
-		} else {
-			focusCaretPosition = getCaretPosition(
+		caretPositions = getCaretPositionsByTextOffset(
+			target,
+			textFacade,
+			selection
+		);
+	}
+
+	setCaret(target, caretPositions);
+}
+
+function getCaretPositionsWhenLeftDirection(
+	target: HTMLElement,
+	textFacade: ITextWidgetFacade,
+	selection: ISelection
+): ICaretPositions {
+	const endCaretPosition = getInitialCaretPosition(target, 'end');
+	const isForwardSelection = isForward(selection);
+
+	if (isForwardSelection) {
+		if (selection.anchorText === selection.focusText) {
+			return {
+				anchor: getCaretPosition(
+					target,
+					'start',
+					searchCaretPositionByTextOffset,
+					selection.anchorOffset,
+					textFacade
+				),
+				focus: endCaretPosition,
+			};
+		}
+
+		return {
+			anchor: getInitialCaretPosition(target, 'start'),
+			focus: endCaretPosition,
+		};
+	}
+
+	return {
+		focus: endCaretPosition,
+		anchor: endCaretPosition,
+	};
+}
+
+function getCaretPositionsWhenRightDirection(
+	target: HTMLElement,
+	textFacade: ITextWidgetFacade,
+	selection: ISelection
+): ICaretPositions {
+	const startCaretPosition = getInitialCaretPosition(target, 'start');
+	const isBackwardSelection = !isForward(selection);
+
+	if (isBackwardSelection) {
+		if (selection.anchorText === selection.focusText) {
+			return {
+				anchor: getCaretPosition(
+					target,
+					'end',
+					searchCaretPositionByTextOffset,
+					selection.anchorOffset,
+					textFacade
+				),
+				focus: startCaretPosition,
+			};
+		}
+
+		return {
+			anchor: getInitialCaretPosition(target, 'end'),
+			focus: startCaretPosition,
+		};
+	}
+
+	return {
+		focus: startCaretPosition,
+		anchor: startCaretPosition,
+	};
+}
+
+function getCaretPositionsByOffset(
+	target: HTMLElement,
+	textFacade: ITextWidgetFacade,
+	selection: ISelection
+): ICaretPositions | never {
+	if (typeof selection.offsetX !== 'number') {
+		throw new Error("Can't compute caret positions. No offset in selection");
+	}
+
+	const startSearchFrom = isForward(selection) ? 'start' : 'end';
+
+	const focus = getCaretPosition(
+		target,
+		startSearchFrom,
+		searchCaretPositionByOffset,
+		selection.offsetX
+	);
+
+	let anchor: ICaretPosition;
+	if (selection.focusText === selection.anchorText) {
+		if (typeof selection.anchorOffset === 'number') {
+			anchor = getCaretPosition(
 				target,
 				startSearchFrom,
 				searchCaretPositionByTextOffset,
-				selection.focusOffset,
+				selection.anchorOffset,
 				textFacade
 			);
+		} else {
+			anchor = focus;
+		}
+	} else {
+		anchor = getInitialCaretPosition(target, startSearchFrom);
+	}
 
-			if (selection.anchorText === selection.focusText) {
-				anchorCaretPosition = getCaretPosition(
+	return {
+		focus,
+		anchor,
+	};
+}
+
+function getCaretPositionsByTextOffset(
+	target: HTMLElement,
+	textFacade: ITextWidgetFacade,
+	selection: ISelection
+): ICaretPositions {
+	const startSearchFrom = isForward(selection) ? 'start' : 'end';
+
+	const focus = getCaretPosition(
+		target,
+		startSearchFrom,
+		searchCaretPositionByTextOffset,
+		selection.focusOffset,
+		textFacade
+	);
+	const anchor =
+		selection.anchorText === selection.focusText
+			? getCaretPosition(
 					target,
 					startSearchFrom,
 					searchCaretPositionByTextOffset,
 					selection.anchorOffset,
 					textFacade
-				);
-			} else {
-				anchorCaretPosition = getInitialCaretPosition(
-					target,
-					startSearchFrom
-				);
-			}
-		}
-	}
+				)
+			: getInitialCaretPosition(target, startSearchFrom);
 
-	setCaret(target, anchorCaretPosition, focusCaretPosition);
+	return {
+		focus,
+		anchor,
+	};
 }

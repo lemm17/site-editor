@@ -1,6 +1,7 @@
 import { IFrameFacade, ISelection, IWidgetFacade } from 'types';
 import isFrameFacade from '../actions/isFrameFacade';
 import { default as CFDFSTraverse } from '../CFDFSTraverse';
+import isForward from './isForward';
 
 export default function computeSelectedWidgets(
 	selection: ISelection,
@@ -18,9 +19,7 @@ export default function computeSelectedWidgets(
 		return selectedWidgets;
 	}
 
-	const direction = ['down', 'right', 'end'].includes(selection.direction)
-		? 'right'
-		: 'left';
+	const direction = isForward(selection) ? 'right' : 'left';
 	const anchorPathAsString = selection.anchorText.path.join('');
 
 	CFDFSTraverse(selection.anchorText, direction, (regular) => {

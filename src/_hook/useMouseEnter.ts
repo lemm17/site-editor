@@ -1,6 +1,6 @@
 import { EditorContext } from 'context';
 import { useContext } from 'solid-js';
-import { IDirection, ITextWidgetFacade } from 'types';
+import { ITextWidgetFacade } from 'types';
 import { computeTextOffsetByOffsetX, isRightTextPathOf } from 'utils';
 
 const PRIMARY_BUTTON_PRESSED = 1;

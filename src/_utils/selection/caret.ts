@@ -1,5 +1,6 @@
 import {
 	ICaretPosition,
+	ICaretPositions,
 	ICursorInfo,
 	ISelection,
 	ITextWidgetFacade,
@@ -11,14 +12,18 @@ import { computeOffsetByCaretPosition } from './computeSelection';
 import { getRangeCoords } from './coords';
 import isEmpty from './isEmpty';
 import { default as isEqualSelection } from './isEqual';
-import { getRange, isForwardSelectionByRange } from './range';
+import {
+	getCorrectTextNode,
+	getRange,
+	isForwardSelectionByRange,
+} from './range';
 import {
 	getCaretRectAtPosition,
 	getCursorRect,
 	getFirstNodeRect,
 	getLastNodeRect,
 } from './rect';
-import { getSiblingTextNode, getTextNode } from './textNodes';
+import { getSiblingTextNode, getTextNode, isTextNode } from './textNodes';
 
 export function isEqualCaretPosition(
 	a: ICaretPosition,
@@ -29,11 +34,15 @@ export function isEqualCaretPosition(
 
 export function getCurrentCaretPosition(): ICaretPosition {
 	const range = getRange();
-	const isForward = isForwardSelectionByRange(range);
+	const isForward = isForwardSelectionByRange();
 
 	if (isForward) {
+		// Частный случай
+		// Костыль
+		const correctedEndContainer = getCorrectTextNode(range.endContainer);
+
 		return {
-			node: range.endContainer,
+			node: correctedEndContainer,
 			offset: range.endOffset,
 		};
 	}
@@ -77,8 +86,7 @@ export function getInitialCaretPosition(
 
 export function setCaret(
 	target: HTMLElement,
-	anchorCaretPosition: ICaretPosition,
-	focusCaretPosition: ICaretPosition
+	caretPositions: ICaretPositions
 ): void {
 	// В safari перед изменением выделения нужно активировать контейнер,
 	// где находится нода из выделения
@@ -88,16 +96,16 @@ export function setCaret(
 
 	const selection = window.getSelection();
 	selection.setBaseAndExtent(
-		anchorCaretPosition.node,
-		anchorCaretPosition.offset,
-		focusCaretPosition.node,
-		focusCaretPosition.offset
+		caretPositions.anchor.node,
+		caretPositions.anchor.offset,
+		caretPositions.focus.node,
+		caretPositions.focus.offset
 	);
 
 	if (!detection.safari) {
 		// Исправляет ошибку:
 		// https://online.sbis.ru/opendoc.html?guid=905254c4-95bf-40c1-a2ae-fbda8de93710&client=3
-		focusCaretPosition.node.parentElement?.focus();
+		caretPositions.focus.node.parentElement?.focus();
 	}
 }
 

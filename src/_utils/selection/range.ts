@@ -1,4 +1,4 @@
-import { getTextNodes, isTextNode } from './textNodes';
+import { getTextNode, getTextNodes, isTextNode } from './textNodes';
 
 export function getRange(): Range | null {
 	const selection = window.getSelection();
@@ -9,33 +9,45 @@ export function getRange(): Range | null {
 	return selection.getRangeAt(selection.rangeCount - 1).cloneRange();
 }
 
-export function isForwardSelectionByRange(
-	range: Range = getRange()
-): boolean | never {
-	if (!range) {
+export function getCorrectTextNode(node: Node): Node {
+	if (!isTextNode(node) && node.textContent === '\u200b') {
+		return getTextNode(node as HTMLElement, 'start');
+	}
+
+	return node;
+}
+
+export function isForwardSelectionByRange(): boolean | never {
+	const selection = document.getSelection();
+	if (!selection.rangeCount) {
 		throw new Error('There are no any range in selcetion');
 	}
 
-	if (isTextNode(range.commonAncestorContainer)) {
+	if (selection.focusNode === selection.anchorNode) {
 		// Если общий контейнер - текст, значит выделение находится внутри одной текстовой ноды,
 		// а значит, направление определяется по оффсету
-		return range.startOffset < range.endOffset;
+		return selection.anchorOffset < selection.focusOffset;
 	}
+
+	const commonAncestorContainer =
+		selection.getRangeAt(0).commonAncestorContainer;
 
 	// Иначе определяем по индексу узлов
 	const allTextNodesInsideCommonAncestorContainer = getTextNodes(
-		range.commonAncestorContainer as HTMLElement
+		commonAncestorContainer as HTMLElement
 	);
 
-	const indexOfStartContainer =
+	const indexOfFocusContainer =
 		allTextNodesInsideCommonAncestorContainer.findIndex(
-			(x) => x === range.startContainer
+			// Частный случай
+			// Костыль
+			(x) => x === getCorrectTextNode(selection.focusNode)
 		);
 
-	const indexOfEndContainer =
+	const indexOfAnchorContainer =
 		allTextNodesInsideCommonAncestorContainer.findIndex(
-			(x) => x === range.endContainer
+			(x) => x === selection.anchorNode
 		);
 
-	return indexOfStartContainer < indexOfEndContainer;
+	return indexOfAnchorContainer < indexOfFocusContainer;
 }

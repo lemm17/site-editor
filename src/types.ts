@@ -293,7 +293,11 @@ export interface IFrameFacade extends IFacade<IBaseFacade> {
 	children: IWidgetFacade[];
 
 	_subscribeFocus(id: IWidgetFacade, callback: FocusCallback): void;
-	_leaveFocus(value: IWidgetFacade, selection: ISelection): void;
+	_leaveFocus(
+		value: IWidgetFacade,
+		selection: ISelection,
+		shift: boolean
+	): void;
 	_mouseLeaveText(
 		value: IWidgetFacade,
 		anchorOffset: IAnchorPoint['anchorOffset']
@@ -319,8 +323,8 @@ export interface IFocusPoint {
 }
 
 export type ISelection = {
-	direction: IDirection;
-	offset: number | null;
+	focusDirection: IDirection;
+	offsetX: number | null;
 } & IAnchorPoint &
 	IFocusPoint;
 
@@ -328,6 +332,11 @@ export interface ICaretPosition {
 	node: Node;
 	offset: number;
 	rect?: Omit<DOMRect, 'toJSON'>;
+}
+
+export interface ICaretPositions {
+	anchor: ICaretPosition;
+	focus: ICaretPosition;
 }
 
 export interface ICursorInfo {

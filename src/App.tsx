@@ -11,13 +11,38 @@ const EMOJI = '☢️';
 const mockedValue: IFrame = [
 	'frame',
 	{},
-	[WIDGETS.text, 'Hello'],
+	[WIDGETS.text, 'Hello fdsai ufbdsao iuhfasdopi hfoaspiud'],
 	[
 		WIDGETS.blockquote,
-		[WIDGETS.text, '', [WIDGETS.emoji, { value: EMOJI }], 'hello'],
-		[WIDGETS.text, 'world!', [WIDGETS.emoji, { value: EMOJI }], ''],
+		[
+			WIDGETS.text,
+			'',
+			[WIDGETS.emoji, { value: EMOJI }],
+			'hello fosuadh fouihsad hopiufas',
+		],
+		[
+			WIDGETS.text,
+			'world! f9dsahg fo089dsah',
+			[WIDGETS.emoji, { value: EMOJI }],
+			'',
+		],
 	],
-	[WIDGETS.text, 'World!'],
+	[
+		WIDGETS.blockquote,
+		[
+			WIDGETS.text,
+			'',
+			[WIDGETS.emoji, { value: EMOJI }],
+			'hello fosuadh fouihsad hopiufas',
+		],
+		[
+			WIDGETS.text,
+			'world! f9dsahg fo089dsah',
+			[WIDGETS.emoji, { value: EMOJI }],
+			'',
+		],
+	],
+	[WIDGETS.text, 'World! fdsa9u8 hfdsauogh fas'],
 ];
 
 let preRef: HTMLPreElement;

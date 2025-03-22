@@ -25,8 +25,8 @@ import isRightTextPathOf from '../isRightTextPathOf';
  */
 export default function computeSelection(
 	textFacade: ITextWidgetFacade,
-	direction: IDirection = null,
-	offset: number = computeOffset(getRange())
+	focusDirection: IDirection = null,
+	offset: number = computeOffset()
 ): ISelection | never {
 	const selection = document.getSelection();
 	const range = getRange();
@@ -116,17 +116,17 @@ export default function computeSelection(
 		}
 	}
 
-	let computedDirection = direction;
-	if (!computedDirection) {
+	let computedFocusDirection = focusDirection;
+	if (!computedFocusDirection) {
 		if (textFacade.frameFacade.anchorPoint) {
 			const isAnchorToTheLeft = isRightTextPathOf(
 				textFacade.path,
 				textFacade.frameFacade.anchorPoint.anchorText.path
 			);
 
-			computedDirection = isAnchorToTheLeft ? 'down' : 'up';
+			computedFocusDirection = isAnchorToTheLeft ? 'down' : 'up';
 		} else {
-			computedDirection = focusOffset > anchorOffset ? 'right' : 'left';
+			computedFocusDirection = focusOffset > anchorOffset ? 'right' : 'left';
 		}
 	}
 
@@ -135,19 +135,15 @@ export default function computeSelection(
 		focusText: textFacade,
 		anchorOffset,
 		focusOffset,
-		direction: computedDirection,
-		offset,
+		focusDirection: computedFocusDirection,
+		offsetX: offset,
 		// null or anchorText & anchorOffset
 		...textFacade.frameFacade.anchorPoint,
 	};
 }
 
-// export function computeDirection(textFacade: ITextWidgetFacade): IDirection {
-
-// }
-
 export function computeOffset(range: Range = getRange()): number {
-	return getCoords(range, isForwardSelectionByRange(range)).x;
+	return getCoords(range, !isForwardSelectionByRange()).x;
 }
 
 export function facadeContainsSelection(
@@ -189,9 +185,9 @@ export function computeTextOffsetByOffsetX(
 	textFacade: ITextWidgetFacade,
 	container: HTMLElement,
 	offsetX: number,
-	direction: IDirection
+	focusDirection: IDirection
 ): number {
-	const startSearchFrom = direction === 'up' ? 'end' : 'start';
+	const startSearchFrom = focusDirection === 'up' ? 'end' : 'start';
 
 	const caretPosition = getCaretPosition(
 		container,

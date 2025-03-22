@@ -12,9 +12,6 @@ export default function useFocus(
 	const [rects, setRects] = createSignal(DEFAULT_RECTS);
 
 	frameFacade._subscribeFocus(value, (selection) => {
-		if (!selection) {
-			setRects(DEFAULT_RECTS);
-		}
 		const newRects = focusCallback(selection);
 		if (newRects) {
 			setRects(newRects);
