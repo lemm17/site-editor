@@ -50,6 +50,7 @@ p {
     margin: 0
 }
 
-.editor p {
+.text-widget {
     margin: 6px 0;
+    position: relative;
 }

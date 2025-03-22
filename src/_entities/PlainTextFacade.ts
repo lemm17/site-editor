@@ -17,6 +17,7 @@ export default class PlainTextFacade
 	private set children(_) {}
 	readonly type: typeof TYPE = TYPE;
 	readonly properties: {} = {};
+	readonly isInline: true = true;
 	get text(): string {
 		return this._text;
 	}

@@ -1,50 +1,47 @@
-import { IEdgesInfo, ISelection, ITextWidgetFacade } from 'types';
+import { ISelectionInfo, ISelection } from 'types';
 import isPlainTextFacade from '../plainTextActions/isPlainTextFacade';
-import getEdgesInfo from './getEdgesInfo';
+import getSelectionInfo from './getEdgesInfo';
 import getSibling from './getSibling';
 import insertTextCrossWidget from './insertTextCrossWidget';
 import removeWidget from './removeWidget';
 
 export default function deleteContent(
-	backward: boolean,
-	target: ITextWidgetFacade,
-	selection: ISelection
+	selection: ISelection,
+	forward: boolean
 ): void {
-	const forward = !backward;
-	const edgesInfo = getEdgesInfo(target, selection);
+	const backward = !forward;
+	const edgesInfo = getSelectionInfo(selection);
 
-	if (edgesInfo.startChild === edgesInfo.endChild) {
-		const startIndex = edgesInfo.startIndexRelativeToStartChild;
-		const endIndex = edgesInfo.endIndexRelativeToEndChild;
+	if (edgesInfo.start.plainText === edgesInfo.end.plainText) {
+		const startIndex = edgesInfo.start.plainTextOffset;
+		const endIndex = edgesInfo.end.plainTextOffset;
 		const isCollapsed = startIndex === endIndex;
 
 		// Если курсор в начале PlainText - удаляем предыдущий виджет внутри
 		// текстового виджета (если он есть)
 		const noTextLeft = startIndex === 0 && backward;
 		const noTextRight =
-			endIndex === edgesInfo.startChild.text.length && forward;
+			endIndex === edgesInfo.start.plainText.text.length && forward;
 		if (isCollapsed && (noTextLeft || noTextRight)) {
-			deleteContentOnSibling(backward, target, edgesInfo);
+			deleteContentOnSibling(backward, edgesInfo);
 		} else {
-			edgesInfo.startChild.insertText(
+			edgesInfo.start.plainText.insertText(
 				'',
 				isCollapsed && backward ? Math.max(0, startIndex - 1) : startIndex,
 				isCollapsed && forward ? endIndex + 1 : endIndex
 			);
 		}
 	} else {
-		const newChildren = insertTextCrossWidget(target, '', edgesInfo);
-		target.children = newChildren;
+		insertTextCrossWidget('', edgesInfo);
 	}
 }
 
 export function deleteContentOnSibling(
 	backward: boolean,
-	target: ITextWidgetFacade,
-	edgesInfo: IEdgesInfo
+	edgesInfo: ISelectionInfo
 ): void {
 	const forward = !backward;
-	const siblingChild = getSibling(edgesInfo.startChild, target, forward);
+	const siblingChild = getSibling(edgesInfo.start.plainText, forward);
 
 	if (!siblingChild) {
 		return;
@@ -64,6 +61,6 @@ export function deleteContentOnSibling(
 			siblingChild.insertText('', 0, 1);
 		}
 	} else {
-		removeWidget(siblingChild, target);
+		removeWidget(siblingChild);
 	}
 }

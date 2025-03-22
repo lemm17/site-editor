@@ -1,11 +1,16 @@
 import {
 	IDirection,
-	ISelection,
 	ITextWidgetComponentProps,
 	TEXT_WIDGET_CLASS_NAME,
 } from 'types';
-import { children, onMount } from 'solid-js';
-import { useFocus, useLeaveFocus, useCursorOffset } from 'hook';
+import { children, onMount, For } from 'solid-js';
+import {
+	useFocus,
+	useLeaveFocus,
+	useCursorOffset,
+	useMouseLeave,
+	useMouseEnter,
+} from 'hook';
 import {
 	applySelection,
 	shouldLetOutCursor,
@@ -14,6 +19,7 @@ import {
 } from 'utils';
 import { keyboardKeyToDirectionMap, resetOffsetKeys } from './Text/constants';
 import { ignoreZeroWidthSpaceIfNeed, isAllowedInputType } from './Text/helpers';
+import './Text/Text.css';
 
 export interface ITextProps {}
 
@@ -21,11 +27,13 @@ export default function Text(props: ITextWidgetComponentProps) {
 	const resolvedChildren = children(() => props.children);
 	let ref: HTMLParagraphElement;
 
-	useFocus(props.value, (selection) => {
-		applySelection(ref, props.value, selection);
+	const syntheticSelectionRects = useFocus(props.value, (selection) => {
+		return applySelection(ref, props.value, selection);
 	});
 	const leaveFocus = useLeaveFocus(props.value);
 	const [computeOffset, resetOffset] = useCursorOffset();
+	const onMouseLeave = useMouseLeave(props.value);
+	const onMouseEnter = useMouseEnter(props.value);
 
 	const onBeforeInput = (e: InputEvent) => {
 		e.preventDefault();
@@ -52,112 +60,72 @@ export default function Text(props: ITextWidgetComponentProps) {
 	};
 
 	const onInsertParagraph = (e: InputEvent): void => {
-		const selectionBeforeInput = computeSelection(props.value, ref);
-
 		props.value.input({
 			type: 'insertParagraph',
 			timeStamp: e.timeStamp,
-			selection: selectionBeforeInput,
+			selection: computeSelection(props.value),
 		});
-
-		// Постановку курсора в новый параграф делигируем фрейм-фасаду
 	};
 
 	const onDeleteContent = (e: InputEvent, backward: boolean): void => {
 		const forward = !backward;
-		const selectionBeforeInput = computeSelection(props.value, ref);
+		const selection = computeSelection(props.value);
 		const currentLength = props.value.length;
 
 		const shouldMergeContentBackward =
 			backward &&
-			selectionBeforeInput.anchor === 0 &&
-			selectionBeforeInput.focus === 0;
+			isCollapsed(selection) &&
+			selection.anchorOffset === 0 &&
+			selection.focusOffset === 0;
 		const shouldMergeContentForward =
 			forward &&
-			selectionBeforeInput.anchor === currentLength &&
-			selectionBeforeInput.focus === currentLength;
+			isCollapsed(selection) &&
+			selection.anchorOffset === currentLength &&
+			selection.focusOffset === currentLength;
 
 		if (shouldMergeContentBackward) {
 			props.value.input({
 				type: 'mergeContentBackward',
 				timeStamp: e.timeStamp,
-				selection: selectionBeforeInput,
+				selection: selection,
 			});
-
-			// Делигируем установку курсора в смерженном состоянии фрейм-фасаду
 		} else if (shouldMergeContentForward) {
 			props.value.input({
 				type: 'mergeContentForward',
 				timeStamp: e.timeStamp,
-				selection: selectionBeforeInput,
+				selection: selection,
 			});
-
-			// Делигируем установку курсора в смерженном состоянии фрейм-фасаду
 		} else {
-			const type = backward
-				? 'deleteContentBackward'
-				: 'deleteContentForward';
 			props.value.input({
-				type,
+				type: backward ? 'deleteContentBackward' : 'deleteContentForward',
 				timeStamp: e.timeStamp,
-				selection: selectionBeforeInput,
+				selection: selection,
 			});
-
-			const textOffsetModifier = backward ? -1 : 0;
-			const textOffsetAfterInput = isCollapsed(selectionBeforeInput)
-				? selectionBeforeInput.anchor + textOffsetModifier
-				: Math.min(selectionBeforeInput.anchor, selectionBeforeInput.focus);
-
-			const selectionAfterInput = {
-				anchor: textOffsetAfterInput,
-				focus: textOffsetAfterInput,
-				direction: null,
-				offset: null,
-			};
-
-			applySelection(ref, props.value, selectionAfterInput);
 		}
 	};
 
 	const onInsertText = (e: InputEvent): void => {
-		const selectionBeforeInput = computeSelection(props.value, ref);
 		props.value.input({
 			type: 'insertText',
 			timeStamp: e.timeStamp,
 			text: e.data,
-			selection: selectionBeforeInput,
+			selection: computeSelection(props.value),
 		});
-
-		const textOffsetAfterInput =
-			Math.min(selectionBeforeInput.anchor, selectionBeforeInput.focus) + 1;
-		const selectionAfterInput: ISelection = {
-			anchor: textOffsetAfterInput,
-			focus: textOffsetAfterInput,
-			direction: null,
-			offset: null,
-		};
-		applySelection(ref, props.value, selectionAfterInput);
 	};
 
 	const onKeyDown = (e: KeyboardEvent) => {
 		ignoreZeroWidthSpaceIfNeed(e);
 
-		if (e.key in keyboardKeyToDirectionMap) {
+		if (e.key in keyboardKeyToDirectionMap && shouldLetOutCursor(e, ref)) {
+			e.preventDefault();
+
 			const direction = keyboardKeyToDirectionMap[e.key] as IDirection;
-			let selection = computeSelection(props.value, ref, direction);
-
-			if (shouldLetOutCursor(e, ref)) {
-				e.preventDefault();
-
-				// Проставляем общий offset, а не вычесленный налету ранее
-				const offset = computeOffset();
-				selection = {
-					...selection,
-					offset,
-				};
-
-				leaveFocus(selection);
-			}
+			const selection = computeSelection(
+				props.value,
+				direction,
+				computeOffset()
+			);
+			leaveFocus(selection, e.shiftKey);
 		}
 
 		if (resetOffsetKeys.includes(e.key)) {
@@ -170,14 +138,27 @@ export default function Text(props: ITextWidgetComponentProps) {
 	});
 
 	return (
-		<p
-			ref={ref}
+		<div
 			onKeyDown={onKeyDown}
 			contentEditable={true}
 			class={TEXT_WIDGET_CLASS_NAME}
 			onBeforeInput={onBeforeInput}
+			onMouseLeave={onMouseLeave}
+			onMouseEnter={(e) => onMouseEnter(e, ref)}
 		>
-			{resolvedChildren()}
-		</p>
+			<div class='syntetic-selection'>
+				<For each={syntheticSelectionRects()}>
+					{(selectionRect) => {
+						return (
+							<div
+								class='syntetic-selection-row'
+								style={selectionRect}
+							/>
+						);
+					}}
+				</For>
+			</div>
+			<p ref={ref}>{resolvedChildren()}</p>
+		</div>
 	);
 }

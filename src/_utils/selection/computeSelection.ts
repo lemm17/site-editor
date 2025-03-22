@@ -1,15 +1,23 @@
 import {
+	IAnchorPoint,
 	ICaretPosition,
 	IDirection,
+	IFocusPoint,
 	INLINE_WIDGET_OFFSET_LENGTH,
 	IPlainTextFacade,
 	ISelection,
 	ITextWidgetFacade,
 	PLAIN_TEXT_FACADE_TYPE,
 } from 'types';
-import { isForwardSelection, getRange } from './range';
+import { isForwardSelectionByRange, getRange } from './range';
 import { getCoords } from './coords';
 import { getParentIfText } from './textNodes';
+import {
+	getCaretPosition,
+	getCurrentAnchorCaretPosition,
+	searchCaretPositionByOffset,
+} from './caret';
+import isRightTextPathOf from '../isRightTextPathOf';
 
 /**
  * Перед вызовом функции необходимо убедиться, что selection
@@ -17,9 +25,8 @@ import { getParentIfText } from './textNodes';
  */
 export default function computeSelection(
 	textFacade: ITextWidgetFacade,
-	target: HTMLElement,
-	direction: IDirection = null,
-	offset: number = computeOffset(getRange())
+	focusDirection: IDirection = null,
+	offset: number = computeOffset()
 ): ISelection | never {
 	const selection = document.getSelection();
 	const range = getRange();
@@ -43,24 +50,6 @@ export default function computeSelection(
 	const focusElement = getParentIfText(selection.focusNode as HTMLElement);
 	const anchorElement = getParentIfText(selection.anchorNode as HTMLElement);
 
-	if (
-		selection.isCollapsed &&
-		focusElement === target &&
-		selection.focusOffset === 0
-	) {
-		// Особый случай. Почему-то, если выходить стрелкой влево из
-		// текста с инлайн-виджетом на первом месте, в anchorNode
-		// и focusNode записывается корень текстового виджета - p.
-		// Если выходить вправо, когда инлайн-виджет в конце,
-		// такого эффекта не наблюдается.
-		return {
-			anchor: 0,
-			focus: 0,
-			direction,
-			offset,
-		};
-	}
-
 	const focusId = focusElement?.id;
 	if (!focusId) {
 		throw new Error(
@@ -77,8 +66,8 @@ export default function computeSelection(
 
 	let anchorFinish = false;
 	let focusFinish = false;
-	let anchor = 0;
-	let focus = 0;
+	let anchorOffset = 0;
+	let focusOffset = 0;
 	for (const child of textFacade.children) {
 		if (focusFinish && anchorFinish) {
 			break;
@@ -86,11 +75,11 @@ export default function computeSelection(
 
 		if (child.type !== PLAIN_TEXT_FACADE_TYPE) {
 			if (!anchorFinish) {
-				anchor += INLINE_WIDGET_OFFSET_LENGTH;
+				anchorOffset += INLINE_WIDGET_OFFSET_LENGTH;
 			}
 
 			if (!focusFinish) {
-				focus += INLINE_WIDGET_OFFSET_LENGTH;
+				focusOffset += INLINE_WIDGET_OFFSET_LENGTH;
 			}
 
 			continue;
@@ -100,14 +89,14 @@ export default function computeSelection(
 			if (focusId === child.id) {
 				if (selection.focusNode.textContent !== '\u200b') {
 					// Игнорируем смещение пустого символа, его нет в данных
-					focus += selection.focusOffset;
+					focusOffset += selection.focusOffset;
 				} else if (selection.focusNode.textContent.length > 1) {
 					throw new Error('hueta kakayato');
 				}
 
 				focusFinish = true;
 			} else {
-				focus += (child as IPlainTextFacade).text.length;
+				focusOffset += (child as IPlainTextFacade).text.length;
 			}
 		}
 
@@ -115,30 +104,105 @@ export default function computeSelection(
 			if (anchorId === child.id) {
 				if (selection.anchorNode.textContent !== '\u200b') {
 					// Игнорируем смещение пустого символа, его нет в данных
-					anchor += selection.anchorOffset;
+					anchorOffset += selection.anchorOffset;
 				} else if (selection.anchorNode.textContent.length > 1) {
 					throw new Error('hueta kakayato');
 				}
 
 				anchorFinish = true;
 			} else {
-				anchor += (child as IPlainTextFacade).text.length;
+				anchorOffset += (child as IPlainTextFacade).text.length;
 			}
 		}
 	}
 
+	let computedFocusDirection = focusDirection;
+	if (!computedFocusDirection) {
+		if (textFacade.frameFacade.anchorPoint) {
+			const isAnchorToTheLeft = isRightTextPathOf(
+				textFacade.path,
+				textFacade.frameFacade.anchorPoint.anchorText.path
+			);
+
+			computedFocusDirection = isAnchorToTheLeft ? 'down' : 'up';
+		} else {
+			computedFocusDirection = focusOffset > anchorOffset ? 'right' : 'left';
+		}
+	}
+
 	return {
-		anchor,
-		focus,
-		direction,
-		offset,
+		anchorText: textFacade,
+		focusText: textFacade,
+		anchorOffset,
+		focusOffset,
+		focusDirection: computedFocusDirection,
+		offsetX: offset,
+		// null or anchorText & anchorOffset
+		...textFacade.frameFacade.anchorPoint,
 	};
 }
 
-export function computeSelectionByCaretPosition(
+export function computeOffset(range: Range = getRange()): number {
+	return getCoords(range, !isForwardSelectionByRange()).x;
+}
+
+export function facadeContainsSelection(
+	textFacade: ITextWidgetFacade
+): boolean {
+	const range = getRange();
+
+	if (!range || !range.commonAncestorContainer) {
+		return false;
+	}
+
+	let current = range.commonAncestorContainer.parentElement;
+	while (current) {
+		if (current.getAttribute('data-inline') === 'false') {
+			return current.id === textFacade.id;
+		}
+		current = current.parentElement;
+	}
+
+	return false;
+}
+
+export function computeAnchorOffset(
+	textFacade: ITextWidgetFacade
+): IAnchorPoint['anchorOffset'] | null {
+	if (!facadeContainsSelection(textFacade)) {
+		return null;
+	}
+
+	const anchorCaretPosition = getCurrentAnchorCaretPosition();
+
+	return computeOffsetByCaretPosition(
+		anchorCaretPosition,
+		textFacade
+	) as IAnchorPoint['anchorOffset'];
+}
+
+export function computeTextOffsetByOffsetX(
+	textFacade: ITextWidgetFacade,
+	container: HTMLElement,
+	offsetX: number,
+	focusDirection: IDirection
+): number {
+	const startSearchFrom = focusDirection === 'up' ? 'end' : 'start';
+
+	const caretPosition = getCaretPosition(
+		container,
+		startSearchFrom,
+		searchCaretPositionByOffset,
+		offsetX
+	);
+
+	return computeOffsetByCaretPosition(caretPosition, textFacade);
+}
+
+export function computeOffsetByCaretPosition(
 	caretPosition: ICaretPosition,
 	textFacade: ITextWidgetFacade
-): ISelection {
+): number {
 	const element = getParentIfText(caretPosition.node);
 	const elementId = element?.id;
 	if (!elementId) {
@@ -166,38 +230,5 @@ export function computeSelectionByCaretPosition(
 		}
 	}
 
-	return {
-		anchor: textOffset,
-		focus: textOffset,
-		direction: null,
-		offset: null,
-	};
-}
-
-export function computeOffset(range: Range = getRange()): number {
-	return getCoords(range, isForwardSelection(range)).x;
-}
-
-export function facadeContainsSelection(
-	textFacade: ITextWidgetFacade
-): boolean {
-	const range = getRange();
-
-	if (!range) {
-		throw new Error('There are no any ranges in selection');
-	}
-
-	if (!range.commonAncestorContainer) {
-		throw new Error('No commonAncestorContainer in selection range');
-	}
-
-	let current = range.commonAncestorContainer.parentElement;
-	while (current) {
-		if (current.getAttribute('data-inline') === 'false') {
-			return current.id === textFacade.id;
-		}
-		current = current.parentElement;
-	}
-
-	return false;
+	return textOffset;
 }

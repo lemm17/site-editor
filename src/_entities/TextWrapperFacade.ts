@@ -7,7 +7,7 @@ export default abstract class TextWrapperFacade<
 > extends WidgetFacade<Properties> {
 	set children(newChildrens: IBaseFacade[]) {
 		if (newChildrens.length === 0) {
-			removeWidget(this, this.frameFacade);
+			removeWidget(this);
 		} else {
 			super.children = newChildrens;
 		}

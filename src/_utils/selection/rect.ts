@@ -9,7 +9,7 @@ export function getCaretRectAtPosition({
 	const range = new Range();
 	range.setEnd(node, offset);
 	range.collapse();
-	return getCursorRect(range, window.getSelection());
+	return getCursorRect(range, window.getSelection(), false);
 }
 
 export function getFirstNodeRect(target: HTMLElement): DOMRect {
@@ -25,7 +25,8 @@ export function getLastNodeRect(target: HTMLElement): DOMRect {
 
 export function getCursorRect(
 	range: Range,
-	selection: Selection
+	selection: Selection,
+	fixCoords: boolean = true
 ): Omit<DOMRect, 'toJSON'> {
 	if (!range) {
 		return null;
@@ -42,7 +43,9 @@ export function getCursorRect(
 		range.collapse(!TO_START);
 	}
 
-	fixCoordsIfNeed(range);
+	if (fixCoords) {
+		fixCoordsIfNeed(range);
+	}
 
 	const rects = range.getClientRects();
 	if (rects.length) {

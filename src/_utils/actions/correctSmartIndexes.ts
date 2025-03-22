@@ -1,4 +1,4 @@
-import { IBaseFacade, Index, SmartIndex, SmartPath } from 'types';
+import { IBaseFacade, Index, SmartPath } from 'types';
 
 export default function correctSmartIndexes(
 	children: IBaseFacade[],
@@ -11,25 +11,31 @@ export default function correctSmartIndexes(
 	});
 }
 
-export function correctParentIndex(
-	children: IBaseFacade[],
-	parentSmartIndex: SmartIndex
+export function correctSmartIndexesByTarget(
+	target: IBaseFacade,
+	children: IBaseFacade[]
 ): void {
-	const parentLevelInTree = children[0].path.length - 2;
-	const correctParentIndexRecursive = (children: IBaseFacade[]): void => {
-		children.forEach((child) => {
-			const newSmartPath: SmartPath = [
-				...child.smartPath.slice(0, parentLevelInTree),
-				parentSmartIndex,
-				...child.smartPath.slice(parentLevelInTree + 1),
-			];
-			child.smartPath = newSmartPath;
+	const parentPath = target.smartPath.slice(0, -1);
+	const indexAfterTarget = target.path.at(-1) + 1;
 
-			if (child.children.length) {
-				correctParentIndexRecursive(child.children);
-			}
-		});
-	};
+	children.forEach((child, i) => {
+		child.smartPath = [...parentPath, [indexAfterTarget + i]];
+	});
+}
 
-	correctParentIndexRecursive(children);
+export function correctParentInChildren(
+	parent: IBaseFacade,
+	children: IBaseFacade[]
+): void {
+	children.forEach((child) => {
+		const newSmartPath: SmartPath = [
+			...parent.smartPath,
+			child.smartPath.at(-1),
+		];
+		child.smartPath = newSmartPath;
+
+		if (child.children.length) {
+			correctParentInChildren(child, child.children);
+		}
+	});
 }

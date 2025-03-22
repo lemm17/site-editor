@@ -5,7 +5,9 @@ export default function isEqual(
 	selectionB: ISelection
 ): boolean {
 	return (
-		selectionA.anchor === selectionB.anchor &&
-		selectionA.focus === selectionB.focus
+		selectionA.anchorOffset === selectionB.anchorOffset &&
+		selectionA.anchorText === selectionB.anchorText &&
+		selectionA.focusOffset === selectionB.focusOffset &&
+		selectionA.focusText === selectionB.focusText
 	);
 }

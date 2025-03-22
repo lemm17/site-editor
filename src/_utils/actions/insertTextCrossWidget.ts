@@ -1,26 +1,29 @@
-import { IBaseFacade, IEdgesInfo, ITextWidgetFacade } from 'types';
-import { splitChildrenByCrossWidgetSelection } from './split';
+import { IPlainTextFacade, ISelectionInfo } from 'types';
+import { splitChildrenBySelection } from './split';
+import removeWidget from './removeWidget';
 
-export default function (
-	target: ITextWidgetFacade,
+export default function insertTextCrossWidget(
 	text: string,
-	edgesInfo: IEdgesInfo
-): IBaseFacade[] {
-	const { startIndexRelativeToStartChild, endIndexRelativeToEndChild } =
-		edgesInfo;
+	selectionInfo: ISelectionInfo
+): void {
+	const { start, middle, end } = selectionInfo;
 
-	const [leftChildren, middleLeftChild, middleRightChild, rightChildren] =
-		splitChildrenByCrossWidgetSelection(target, edgesInfo);
+	const [leftPart, rightPart] = splitChildrenBySelection(selectionInfo);
 
-	middleLeftChild.insertText(
-		text,
-		startIndexRelativeToStartChild,
-		middleLeftChild.text.length
-	);
-	middleRightChild.insertText('', 0, endIndexRelativeToEndChild);
+	const middleLeftChild = leftPart.at(-1) as IPlainTextFacade;
+	// Добавляем вставляемый текст в конец плейн-текст ноды в которой стоит стартовая каретка выделения
+	middleLeftChild.insertText(text, middleLeftChild.text.length);
 
-	const leftPart = [...leftChildren, middleLeftChild];
-	const rightPart = [middleRightChild, ...rightChildren];
+	// Удаляем все, что между выделением
+	middle.forEach((widget) => {
+		removeWidget(widget);
+	});
 
-	return [...leftPart, ...rightPart];
+	// Удаляем текстовый виджет конца выделения, если края выделения в разных текстовых виджетах
+	if (start.text !== end.text) {
+		removeWidget(end.text);
+	}
+
+	// Склеиваем левую часть текстого виджета старта с правой часть текстового виджета конца выделения
+	start.text.children = [...leftPart, ...rightPart];
 }

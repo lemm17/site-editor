@@ -21,7 +21,7 @@ describe('Проверка конструктора фрейм-фасада', ()
 		[WIDGETS.text, 'World!'],
 	];
 	const testedFrame: IFrame = ['frame', {}, ...testedChildrens];
-	const frameFacade = new FrameFacade(testedFrame, widgetFacadeMap);
+	const frameFacade = new FrameFacade(testedFrame, widgetFacadeMap, null);
 	const frameFacadeChildren = frameFacade.children;
 
 	checkChildrenWF(frameFacadeChildren, testedChildrens.length);

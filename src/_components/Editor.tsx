@@ -17,8 +17,12 @@ interface IEditorProps {
 }
 
 export default function Editor({ frameFacade, componentMap }: IEditorProps) {
+	const editorContext = {
+		frameFacade,
+		cursorOffset: null,
+	};
 	return (
-		<EditorContext.Provider value={{ frameFacade, cursorOffset: null }}>
+		<EditorContext.Provider value={editorContext}>
 			<div class='editor'>
 				<RecursiveRender
 					children={frameFacade.children}
@@ -83,20 +87,6 @@ function ComponentWrapper<T extends object = {}>(
 
 	onMount(() => offRender());
 
-	if (value.isInline) {
-		return (
-			<span
-				class={RENDER_CLASS}
-				// Если вставить false как boolean, SolidJS его вырежет
-				contentEditable={'false' as unknown as boolean}
-				id={value.id}
-				data-inline={'true'}
-			>
-				<Component value={value}>{resolvedChildren()}</Component>
-			</span>
-		);
-	}
-
 	if (isPlainTextFacade(value as unknown as IPlainTextFacade)) {
 		const plainTextFacade = value as unknown as IPlainTextFacade;
 		const getText = plainTextFacade._createTextSignal();
@@ -108,6 +98,20 @@ function ComponentWrapper<T extends object = {}>(
 				id={plainTextFacade.id}
 			>
 				{getText()}
+			</span>
+		);
+	}
+
+	if (value.isInline) {
+		return (
+			<span
+				class={RENDER_CLASS}
+				// Если вставить false как boolean, SolidJS его вырежет
+				contentEditable={'false' as unknown as boolean}
+				id={value.id}
+				data-inline={'true'}
+			>
+				<Component value={value}>{resolvedChildren()}</Component>
 			</span>
 		);
 	}

@@ -1,5 +1,8 @@
 import { ISelection } from 'types';
 
 export default function (selection: ISelection): boolean {
-	return selection.anchor === selection.focus;
+	return (
+		selection.anchorOffset === selection.focusOffset &&
+		selection.anchorText === selection.focusText
+	);
 }

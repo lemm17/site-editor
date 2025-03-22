@@ -1,4 +1,4 @@
-import { Accessor, JSXElement } from 'solid-js';
+import { Accessor, JSXElement, Setter } from 'solid-js';
 
 export type UUID = string;
 
@@ -178,7 +178,7 @@ export interface IFacade<T extends IFacade<T>> {
 	smartPath: SmartPath;
 
 	_handleAction<T extends ACTION, D>(action: IAction<T, D>): void;
-	toFrame(): IWidget | IFrame | string;
+	toFrame(withPath?: boolean): IWidget | IFrame | string;
 }
 
 export const PLAIN_TEXT_FACADE_TYPE = 'plainText' as const;
@@ -189,23 +189,24 @@ export interface IBaseFacade<Properties extends IProperties = {}>
 	readonly type: WIDGETS | typeof PLAIN_TEXT_FACADE_TYPE;
 	readonly properties: Properties;
 	readonly frameFacade: IFrameFacade;
+	readonly isInline: boolean;
 
 	add(addActionData: IAddActionData, initiator?: IBaseFacade): void;
 	remove(initiator?: IBaseFacade): void;
-	toFrame(): IWidget | string;
+	toFrame(withPath?: boolean): IWidget | string;
 }
 
 export interface IWidgetFacade<Properties extends IProperties = {}>
 	extends IBaseFacade<Properties> {
 	readonly type: WIDGETS;
-	readonly isInline: boolean;
 
-	toFrame(): IWidget;
+	toFrame(withPath?: boolean): IWidget;
 }
 
 export interface ITextWidgetFacade extends IWidgetFacade<ITextProps> {
 	readonly type: WIDGETS.text;
 	readonly length: number;
+	readonly container: HTMLElement;
 
 	input(data: IInputActionData): void;
 
@@ -221,6 +222,7 @@ export interface IPlainTextFacade extends IBaseFacade {
 	readonly id: UUID;
 	readonly type: typeof PLAIN_TEXT_FACADE_TYPE;
 	readonly properties: {};
+	readonly isInline: true;
 
 	_createTextSignal(): Accessor<string>;
 
@@ -271,33 +273,70 @@ export type ILeafWidget<TWidgetProps extends object = {}> = [
 ];
 
 export type IFrame = ['frame', {}, ...IWidget[]];
-
-export type FocusCallback = (selection: ISelection) => void;
+export type SyntheticSelectionRowRect = {
+	left: string;
+	top: string;
+	height: string;
+	width: string;
+};
+export type SyntheticSelectionRects = SyntheticSelectionRowRect[];
+export type SyntheticSelectionRectsSetter = Setter<SyntheticSelectionRects>;
+export type FocusCallback = (
+	selection: ISelection
+) => null | SyntheticSelectionRects;
 
 export interface IFrameFacade extends IFacade<IBaseFacade> {
 	readonly isFrameFacade: true;
 	readonly widgetFacadeConstructor: WidgetFacadeConstructor;
+	readonly anchorPoint: IAnchorPoint;
 
 	children: IWidgetFacade[];
 
-	subscribeFocus(id: IWidgetFacade, callback: FocusCallback): void;
-	leaveFocus(value: IWidgetFacade, selection: ISelection): void;
+	_subscribeFocus(id: IWidgetFacade, callback: FocusCallback): void;
+	_leaveFocus(
+		value: IWidgetFacade,
+		selection: ISelection,
+		shift: boolean
+	): void;
+	_mouseLeaveText(
+		value: IWidgetFacade,
+		anchorOffset: IAnchorPoint['anchorOffset']
+	): void;
+	_mouseEnterText(
+		value: ITextWidgetFacade,
+		focusOffset: IFocusPoint['focusOffset'],
+		direction: IDirection
+	): void;
 	toFrame(): IFrame;
 }
 
 export type IDirection = 'up' | 'right' | 'down' | 'left' | 'home' | 'end';
 
-export interface ISelection {
-	focus: number;
-	anchor: number;
-	direction: IDirection | null;
-	offset: number;
+export interface IAnchorPoint {
+	anchorText: ITextWidgetFacade;
+	anchorOffset: number;
 }
+
+export interface IFocusPoint {
+	focusText: ITextWidgetFacade;
+	focusOffset: number;
+}
+
+export type ISelection = {
+	focusDirection: IDirection;
+	offsetX: number | null;
+} & IAnchorPoint &
+	IFocusPoint;
 
 export interface ICaretPosition {
 	node: Node;
 	offset: number;
 	rect?: Omit<DOMRect, 'toJSON'>;
+}
+
+export interface ICaretPositions {
+	anchor: ICaretPosition;
+	focus: ICaretPosition;
 }
 
 export interface ICursorInfo {
@@ -417,13 +456,17 @@ export type WidgetFacadeCreator = (
 		? ITextWidgetFacade
 		: IBaseFacade<IProperties>;
 
-export interface IEdgesInfo {
-	startChild: IPlainTextFacade;
-	startChildIndexInParent: number;
-	startIndexRelativeToStartChild: number;
-	endChild: IPlainTextFacade;
-	endChildIndexInParent: number;
-	endIndexRelativeToEndChild: number;
+export interface ISelectionInfo {
+	start: IEdgeInfo;
+	middle: IWidgetFacade[];
+	end: IEdgeInfo;
+}
+
+export interface IEdgeInfo {
+	text: ITextWidgetFacade;
+	plainText: IPlainTextFacade;
+	plainTextIndexInParent: number;
+	plainTextOffset: number;
 }
 
 export enum WIDGETS {

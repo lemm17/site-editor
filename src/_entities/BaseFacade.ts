@@ -30,6 +30,7 @@ export default abstract class BaseFacade<Properties extends IProperties = {}>
 	readonly id: UUID;
 	readonly properties: Properties;
 	readonly frameFacade: IFrameFacade;
+	readonly isInline: boolean;
 
 	get path(): Path {
 		return this._path.map((x) => x[0]);
@@ -94,8 +95,8 @@ export default abstract class BaseFacade<Properties extends IProperties = {}>
 		this._notify(deleteAction);
 	}
 
-	toFrame(): IWidget<Properties> | string {
-		return widgetToFrame(this);
+	toFrame(withPath: boolean = false): IWidget<Properties> | string {
+		return widgetToFrame(this, withPath);
 	}
 
 	_handleAction<T extends ACTION, D>(action: IAction<T, D>): void {

@@ -1,22 +1,29 @@
 import {
 	ICaretPosition,
+	ICaretPositions,
 	ICursorInfo,
 	ISelection,
 	ITextWidgetFacade,
+	SyntheticSelectionRects,
+	SyntheticSelectionRowRect,
 } from 'types';
 import detection from '../detection';
-import { computeSelectionByCaretPosition } from './computeSelection';
+import { computeOffsetByCaretPosition } from './computeSelection';
 import { getRangeCoords } from './coords';
 import isEmpty from './isEmpty';
 import { default as isEqualSelection } from './isEqual';
-import { getRange, isForwardSelection } from './range';
+import {
+	getCorrectTextNode,
+	getRange,
+	isForwardSelectionByRange,
+} from './range';
 import {
 	getCaretRectAtPosition,
 	getCursorRect,
 	getFirstNodeRect,
 	getLastNodeRect,
 } from './rect';
-import { getSiblingTextNode, getTextNode } from './textNodes';
+import { getSiblingTextNode, getTextNode, isTextNode } from './textNodes';
 
 export function isEqualCaretPosition(
 	a: ICaretPosition,
@@ -27,11 +34,15 @@ export function isEqualCaretPosition(
 
 export function getCurrentCaretPosition(): ICaretPosition {
 	const range = getRange();
-	const isForward = isForwardSelection(range);
+	const isForward = isForwardSelectionByRange();
 
 	if (isForward) {
+		// Частный случай
+		// Костыль
+		const correctedEndContainer = getCorrectTextNode(range.endContainer);
+
 		return {
-			node: range.endContainer,
+			node: correctedEndContainer,
 			offset: range.endOffset,
 		};
 	}
@@ -42,12 +53,30 @@ export function getCurrentCaretPosition(): ICaretPosition {
 	};
 }
 
+export function getCurrentAnchorCaretPosition(): ICaretPosition {
+	const selection = document.getSelection();
+
+	return {
+		node: selection.anchorNode,
+		offset: selection.anchorOffset,
+	};
+}
+
 export function getInitialCaretPosition(
 	target: HTMLElement,
-	from: 'start' | 'end'
+	from: 'start' | 'end',
+	withRect: boolean = false
 ): ICaretPosition {
 	const node = getTextNode(target, from);
 	const offset = from === 'end' ? node.textContent.length : 0;
+
+	if (withRect) {
+		return {
+			node,
+			offset,
+			rect: getCaretRectAtPosition({ node, offset }),
+		};
+	}
 
 	return {
 		node,
@@ -57,7 +86,7 @@ export function getInitialCaretPosition(
 
 export function setCaret(
 	target: HTMLElement,
-	caretPosition: ICaretPosition
+	caretPositions: ICaretPositions
 ): void {
 	// В safari перед изменением выделения нужно активировать контейнер,
 	// где находится нода из выделения
@@ -66,12 +95,17 @@ export function setCaret(
 	}
 
 	const selection = window.getSelection();
-	selection.collapse(caretPosition.node, caretPosition.offset);
+	selection.setBaseAndExtent(
+		caretPositions.anchor.node,
+		caretPositions.anchor.offset,
+		caretPositions.focus.node,
+		caretPositions.focus.offset
+	);
 
 	if (!detection.safari) {
 		// Исправляет ошибку:
 		// https://online.sbis.ru/opendoc.html?guid=905254c4-95bf-40c1-a2ae-fbda8de93710&client=3
-		caretPosition.node.parentElement?.focus();
+		caretPositions.focus.node.parentElement?.focus();
 	}
 }
 
@@ -258,28 +292,107 @@ export const searchCaretPositionByOffset: CaretSearcher<[number]> = (
 	return caretPosition;
 };
 
-/**
- * TODO:
- * Функция работает неправильно с не схлопнутым selection'ом.
- * Фактически сейчас она ожидает, что он схлопнут и только тогда
- * будет работать корректно. Необходимо исправить и возвращать 2
- * позиции каретки
- */
-export const searchCaretPositionBySelection: CaretSearcher<
-	[ISelection, ITextWidgetFacade]
-> = (searchConfiguration, selection, textFacade) => {
+function prepareSelectionRowRect(rowRect: {
+	left: number;
+	top: number;
+	height: number;
+	width: number;
+}): SyntheticSelectionRowRect {
+	return {
+		left: `${rowRect.left}px`,
+		top: `${rowRect.top}px`,
+		width: `${rowRect.width}px`,
+		height: `${rowRect.height}px`,
+	};
+}
+
+const ADDITIONAL_SYNTHETIC_SELECTION_WIDTH = 4;
+
+export function computeSyntheticSelectionRects(
+	target: HTMLElement,
+	startCaretPosition: ICaretPosition,
+	endCaretPosition: ICaretPosition
+): SyntheticSelectionRects {
+	const selectionRects: SyntheticSelectionRects = [];
+	const targetRect = target.getBoundingClientRect();
+
+	const rectOfStart = getCaretRectAtPosition(startCaretPosition);
+	let caretPosition = startCaretPosition;
+	let currentRowRect = {
+		left: rectOfStart.left - targetRect.left,
+		top: rectOfStart.top - targetRect.top,
+		height: rectOfStart.height,
+		width: 0,
+	};
+
+	if (isEqualCaretPosition(startCaretPosition, endCaretPosition)) {
+		return [prepareSelectionRowRect(currentRowRect)];
+	}
+
+	while (true) {
+		const newCaretPosition = searchCaretPositionStep(caretPosition, true);
+		const haveReachedEdge = isEqualCaretPosition(
+			newCaretPosition,
+			endCaretPosition
+		);
+
+		const haveMovedOnNextLine =
+			newCaretPosition.rect.y >=
+			caretPosition.rect.y + caretPosition.rect.height;
+
+		if (haveMovedOnNextLine || haveReachedEdge) {
+			const caretForWidthComputing = haveMovedOnNextLine
+				? caretPosition
+				: newCaretPosition;
+			const currentRowWidth =
+				caretForWidthComputing.rect.right -
+				targetRect.left -
+				currentRowRect.left;
+
+			if (haveReachedEdge) {
+				currentRowRect.width = currentRowWidth;
+			} else {
+				// Нативный селекшн выделяет с каким-то отступом сбоку при переносе строки.
+				// Можно убрать и наглядно понаблюдать о чем речь при кросс-селекшене.
+				currentRowRect.width =
+					currentRowWidth + ADDITIONAL_SYNTHETIC_SELECTION_WIDTH;
+			}
+
+			selectionRects.push(prepareSelectionRowRect(currentRowRect));
+
+			if (haveReachedEdge) {
+				break;
+			}
+
+			currentRowRect = {
+				left: newCaretPosition.rect.left - targetRect.left,
+				top: newCaretPosition.rect.top - targetRect.top,
+				height: newCaretPosition.rect.height,
+				width: 0,
+			};
+		}
+
+		caretPosition = newCaretPosition;
+	}
+
+	return selectionRects;
+}
+
+export const searchCaretPositionByTextOffset: CaretSearcher<
+	[number, ITextWidgetFacade]
+> = (searchConfiguration, textOffset, textFacade) => {
 	const { initialCaretPosition, extremeCaretPosition, startSearchFrom } =
 		searchConfiguration;
 	const toRight = startSearchFrom === 'start';
 
 	let caretPosition = initialCaretPosition;
 	while (true) {
-		const caretPositionSelection = computeSelectionByCaretPosition(
+		const caretPositionOffset = computeOffsetByCaretPosition(
 			caretPosition,
 			textFacade
 		);
 
-		if (isEqualSelection(caretPositionSelection, selection)) {
+		if (caretPositionOffset === textOffset) {
 			break;
 		}
 
@@ -295,7 +408,10 @@ export const searchCaretPositionBySelection: CaretSearcher<
 		}
 	}
 
-	return caretPosition;
+	return {
+		...caretPosition,
+		rect: getCaretRectAtPosition(caretPosition),
+	};
 };
 
 const MIN_CHAR_OFFSET = 0;
